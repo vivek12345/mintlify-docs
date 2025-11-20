@@ -1,0 +1,307 @@
+---
+title: "Chunker"
+description: "Smart text chunking with Chonkie"
+---
+
+## Overview
+
+`Chunker` provides intelligent text chunking using the Chonkie library. It preserves semantic boundaries and creates optimal-sized chunks for embedding and retrieval.
+
+## Constructor
+
+```python
+from mini.chunker import Chunker
+
+chunker = Chunker(lang: str = "en")
+```
+
+### Parameters
+
+<ParamField path="lang" type="str" default="en">
+  Language code for the text (e.g., "en", "es", "fr", "de")
+</ParamField>
+
+### Example
+
+```python
+from mini.chunker import Chunker
+
+# English text
+chunker_en = Chunker(lang="en")
+
+# Spanish text
+chunker_es = Chunker(lang="es")
+```
+
+## Methods
+
+### chunk
+
+Split text into semantic chunks.
+
+```python
+def chunk(self, text: str) -> List[Chunk]
+```
+
+#### Parameters
+
+<ParamField path="text" type="str" required>
+  The text to split into chunks
+</ParamField>
+
+#### Returns
+
+<ResponseField name="chunks" type="List[Chunk]">
+  List of Chunk objects with text and metadata
+</ResponseField>
+
+#### Example
+
+```python
+from mini.chunker import Chunker
+
+chunker = Chunker()
+
+text = """
+# Introduction
+
+This is a long document that needs to be split into manageable chunks.
+
+## Section 1
+
+Content for section 1...
+
+## Section 2
+
+Content for section 2...
+"""
+
+chunks = chunker.chunk(text)
+
+for i, chunk in enumerate(chunks):
+    print(f"Chunk {i+1}:")
+    print(f"  Text: {chunk.text[:100]}...")
+    print(f"  Tokens: {chunk.token_count}")
+```
+
+## Chunk Object
+
+Each chunk returned by the `chunk` method has the following attributes:
+
+### Attributes
+
+<ResponseField name="text" type="str">
+  The text content of the chunk
+</ResponseField>
+
+<ResponseField name="token_count" type="int">
+  Number of tokens in the chunk (approximate)
+</ResponseField>
+
+<ResponseField name="start_index" type="int">
+  Starting character position in the original text
+</ResponseField>
+
+<ResponseField name="end_index" type="int">
+  Ending character position in the original text
+</ResponseField>
+
+### Example
+
+```python
+chunks = chunker.chunk(text)
+
+for chunk in chunks:
+    print(f"Text: {chunk.text}")
+    print(f"Tokens: {chunk.token_count}")
+    print(f"Position: {chunk.start_index}-{chunk.end_index}")
+    print()
+```
+
+## Chunking Strategy
+
+The Chunker uses Chonkie's markdown recipe which:
+
+- **Respects semantic boundaries**: Headers, paragraphs, lists
+- **Maintains context**: Keeps related content together
+- **Optimizes token count**: Creates chunks suitable for embedding models
+- **Preserves structure**: Maintains markdown formatting
+
+### Default Behavior
+
+```python
+chunker = Chunker()
+
+# Uses markdown recipe with:
+# - Target chunk size: ~512 tokens
+# - Respects markdown structure
+# - Preserves headers and context
+```
+
+## Complete Example
+
+```python
+from mini.loader import DocumentLoader
+from mini.chunker import Chunker
+
+# Load document
+loader = DocumentLoader()
+text = loader.load("document.pdf")
+
+print(f"Document length: {len(text)} characters")
+
+# Chunk text
+chunker = Chunker()
+chunks = chunker.chunk(text)
+
+print(f"Created {len(chunks)} chunks")
+
+# Analyze chunks
+total_tokens = sum(chunk.token_count for chunk in chunks)
+avg_tokens = total_tokens / len(chunks)
+
+print(f"Total tokens: {total_tokens}")
+print(f"Average tokens per chunk: {avg_tokens:.1f}")
+
+# Show first few chunks
+for i, chunk in enumerate(chunks[:3]):
+    print(f"\nChunk {i+1} ({chunk.token_count} tokens):")
+    print(chunk.text[:200] + "...")
+```
+
+## Integration Example
+
+Using Chunker in a complete pipeline:
+
+```python
+from mini import AgenticRAG, EmbeddingModel, VectorStore
+from mini.loader import DocumentLoader
+from mini.chunker import Chunker
+
+# Using AgenticRAG (automatic chunking)
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model
+)
+
+# Chunking happens automatically
+rag.index_document("document.pdf")
+
+# Manual chunking for custom pipelines
+loader = DocumentLoader()
+chunker = Chunker()
+embedding_model = EmbeddingModel()
+
+text = loader.load("document.pdf")
+chunks = chunker.chunk(text)
+embeddings = embedding_model.embed_chunks([c.text for c in chunks])
+
+# Store in vector store
+vector_store.insert(
+    embeddings=embeddings,
+    texts=[c.text for c in chunks],
+    metadata=[{"chunk_id": i} for i in range(len(chunks))]
+)
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Chunk Size">
+    The default chunk size (~512 tokens) works well for most embedding models:
+    
+    - OpenAI text-embedding-3-small: 8191 tokens max
+    - Most content fits well in 512-token chunks
+    - Provides good balance of context and retrieval precision
+  </Accordion>
+  
+  <Accordion title="Language-Specific Chunking">
+    Use the appropriate language code:
+    
+    ```python
+    # English
+    chunker_en = Chunker(lang="en")
+    
+    # Spanish
+    chunker_es = Chunker(lang="es")
+    
+    # German
+    chunker_de = Chunker(lang="de")
+    ```
+  </Accordion>
+  
+  <Accordion title="Markdown Documents">
+    The chunker works best with markdown-formatted text:
+    
+    - Respects headers and sections
+    - Preserves lists and code blocks
+    - Maintains document structure
+  </Accordion>
+  
+  <Accordion title="Token Counting">
+    Token counts are approximate:
+    
+    ```python
+    # Get accurate token count if needed
+    import tiktoken
+    
+    enc = tiktoken.get_encoding("cl100k_base")
+    accurate_count = len(enc.encode(chunk.text))
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Chunks Too Large">
+    If chunks are too large for your embedding model:
+    
+    ```python
+    # Check token counts
+    for chunk in chunks:
+        if chunk.token_count > 8000:
+            print(f"Warning: Large chunk ({chunk.token_count} tokens)")
+    ```
+    
+    Consider pre-processing the text or splitting long sections.
+  </Accordion>
+  
+  <Accordion title="Chunks Too Small">
+    If chunks are too small and lack context:
+    
+    - Ensure markdown formatting is present
+    - Check that headers and paragraphs are properly formatted
+    - Consider the document structure
+  </Accordion>
+  
+  <Accordion title="Memory Issues">
+    For very large documents:
+    
+    ```python
+    # Process in segments
+    segment_size = 100000  # characters
+    all_chunks = []
+    
+    for i in range(0, len(text), segment_size):
+        segment = text[i:i + segment_size]
+        chunks = chunker.chunk(segment)
+        all_chunks.extend(chunks)
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## See Also
+
+<CardGroup cols={3}>
+  <Card title="DocumentLoader" icon="file" href="/api-reference/document-loader">
+    Load documents
+  </Card>
+  <Card title="Chunking Guide" icon="scissors" href="/core/chunking">
+    Learn more about chunking
+  </Card>
+  <Card title="EmbeddingModel" icon="layer-group" href="/api-reference/embedding-model">
+    Generate embeddings
+  </Card>
+</CardGroup>
+

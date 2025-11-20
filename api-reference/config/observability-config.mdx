@@ -1,0 +1,245 @@
+---
+title: "ObservabilityConfig"
+description: "Configure monitoring and tracing with Langfuse"
+---
+
+## Overview
+
+`ObservabilityConfig` enables monitoring and tracing of your RAG pipeline using Langfuse.
+
+## Definition
+
+```python
+from dataclasses import dataclass
+from typing import Optional
+
+@dataclass
+class ObservabilityConfig:
+    """Configuration for observability/monitoring."""
+    enabled: bool = False
+    public_key: Optional[str] = None
+    secret_key: Optional[str] = None
+    host: Optional[str] = None
+```
+
+## Fields
+
+<ParamField path="enabled" type="bool" default="False">
+  Whether to enable observability tracking
+</ParamField>
+
+<ParamField path="public_key" type="Optional[str]" default="None">
+  Langfuse public key (defaults to LANGFUSE_PUBLIC_KEY env var)
+</ParamField>
+
+<ParamField path="secret_key" type="Optional[str]" default="None">
+  Langfuse secret key (defaults to LANGFUSE_SECRET_KEY env var)
+</ParamField>
+
+<ParamField path="host" type="Optional[str]" default="None">
+  Langfuse host URL (defaults to LANGFUSE_HOST env var or Langfuse cloud)
+</ParamField>
+
+## Usage
+
+### Basic Usage
+
+```python
+from mini import AgenticRAG, ObservabilityConfig
+
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    observability_config=ObservabilityConfig(
+        enabled=True
+    )
+)
+```
+
+### Complete Configuration
+
+```python
+import os
+from mini import ObservabilityConfig
+
+observability_config = ObservabilityConfig(
+    enabled=True,
+    public_key=os.getenv("LANGFUSE_PUBLIC_KEY"),
+    secret_key=os.getenv("LANGFUSE_SECRET_KEY"),
+    host="https://cloud.langfuse.com"
+)
+
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    observability_config=observability_config
+)
+```
+
+## Environment Variables
+
+Set up your `.env` file:
+
+```bash
+LANGFUSE_PUBLIC_KEY=pk-lf-...
+LANGFUSE_SECRET_KEY=sk-lf-...
+LANGFUSE_HOST=https://cloud.langfuse.com  # Optional
+```
+
+Then use in code:
+
+```python
+from dotenv import load_dotenv
+load_dotenv()
+
+# Automatically uses environment variables
+observability_config = ObservabilityConfig(enabled=True)
+```
+
+## What Gets Tracked
+
+When enabled, Mini RAG tracks:
+
+<AccordionGroup>
+  <Accordion title="Query Operations">
+    - Query text and variations (if query rewriting enabled)
+    - Query execution time
+    - Retrieved chunks and scores
+    - Reranking results
+    - Final answer generation
+  </Accordion>
+  
+  <Accordion title="Document Indexing">
+    - Document loading operations
+    - Chunking results
+    - Embedding generation
+    - Vector store insertions
+  </Accordion>
+  
+  <Accordion title="LLM Calls">
+    - Model used
+    - Tokens consumed
+    - Latency
+    - Input and output
+  </Accordion>
+  
+  <Accordion title="Performance Metrics">
+    - End-to-end latency
+    - Individual component timings
+    - Token usage and costs
+    - Success/failure rates
+  </Accordion>
+</AccordionGroup>
+
+## Setup Langfuse
+
+<Steps>
+  <Step title="Create Account">
+    Sign up at [Langfuse Cloud](https://cloud.langfuse.com) (free tier available)
+  </Step>
+  
+  <Step title="Create Project">
+    Create a new project in Langfuse dashboard
+  </Step>
+  
+  <Step title="Get API Keys">
+    Navigate to Settings → API Keys and copy your keys
+  </Step>
+  
+  <Step title="Set Environment Variables">
+    Add keys to your `.env` file:
+    ```bash
+    LANGFUSE_PUBLIC_KEY=pk-lf-...
+    LANGFUSE_SECRET_KEY=sk-lf-...
+    ```
+  </Step>
+  
+  <Step title="Enable in Code">
+    ```python
+    observability_config = ObservabilityConfig(enabled=True)
+    ```
+  </Step>
+</Steps>
+
+## Benefits
+
+<CardGroup cols={2}>
+  <Card title="Debugging" icon="bug">
+    See exactly what happens in each query
+  </Card>
+  <Card title="Performance" icon="gauge">
+    Track latency and identify bottlenecks
+  </Card>
+  <Card title="Cost Tracking" icon="dollar-sign">
+    Monitor LLM token usage and costs
+  </Card>
+  <Card title="Quality Analysis" icon="chart-line">
+    Analyze retrieval and answer quality
+  </Card>
+</CardGroup>
+
+## Production Example
+
+```python
+import os
+from mini import (
+    AgenticRAG,
+    LLMConfig,
+    RetrievalConfig,
+    ObservabilityConfig,
+    EmbeddingModel,
+    VectorStore
+)
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Initialize with observability
+rag = AgenticRAG(
+    vector_store=VectorStore(...),
+    embedding_model=EmbeddingModel(),
+    llm_config=LLMConfig(model="gpt-4o-mini"),
+    retrieval_config=RetrievalConfig(
+        top_k=10,
+        rerank_top_k=3,
+        use_query_rewriting=True,
+        use_reranking=True
+    ),
+    observability_config=ObservabilityConfig(
+        enabled=True
+    )
+)
+
+# All operations are automatically tracked
+response = rag.query("What is the budget?")
+rag.index_document("document.pdf")
+
+# View traces in Langfuse dashboard
+```
+
+## Disabling Observability
+
+To disable observability (e.g., for local development):
+
+```python
+# Disabled by default
+rag = AgenticRAG(vector_store=vector_store, embedding_model=embedding_model)
+
+# Or explicitly disable
+observability_config = ObservabilityConfig(enabled=False)
+```
+
+## See Also
+
+<CardGroup cols={3}>
+  <Card title="Observability Guide" href="/features/observability">
+    Learn more about observability
+  </Card>
+  <Card title="LangFuse Docs" href="https://langfuse.com/docs">
+    Langfuse documentation
+  </Card>
+  <Card title="Production Guide" href="/guides/production">
+    Deploy to production
+  </Card>
+</CardGroup>
+

@@ -1,33 +1,165 @@
 ---
-title: 'Introduction'
-description: 'Example section for showcasing API endpoints'
+title: "API Reference"
+description: "Complete API reference for Mini RAG library"
 ---
 
-<Note>
-  If you're not looking to build API reference documentation, you can delete
-  this section by removing the api-reference folder.
-</Note>
+## Overview
 
-## Welcome
+Mini RAG provides a modular, Pythonic API for building RAG (Retrieval-Augmented Generation) applications. This reference documentation covers all classes, methods, and configuration options.
 
-There are two ways to build API documentation: [OpenAPI](https://mintlify.com/docs/api-playground/openapi/setup) and [MDX components](https://mintlify.com/docs/api-playground/mdx/configuration). For the starter kit, we are using the following OpenAPI specification.
+## Quick Links
 
-<Card
-  title="Plant Store Endpoints"
-  icon="leaf"
-  href="https://github.com/mintlify/starter/blob/main/api-reference/openapi.json"
->
-  View the OpenAPI specification file
-</Card>
+<CardGroup cols={2}>
+  <Card title="AgenticRAG" icon="robot" href="/api-reference/agentic-rag">
+    Main RAG orchestrator class
+  </Card>
+  <Card title="Configuration" icon="sliders" href="/api-reference/config/llm-config">
+    Configuration dataclasses
+  </Card>
+  <Card title="Vector Store" icon="database" href="/api-reference/vector-store">
+    Milvus vector storage
+  </Card>
+  <Card title="Rerankers" icon="ranking-star" href="/api-reference/rerankers/overview">
+    Reranking strategies
+  </Card>
+</CardGroup>
 
-## Authentication
+## Installation
 
-All API endpoints are authenticated using Bearer tokens and picked up from the specification file.
-
-```json
-"security": [
-  {
-    "bearerAuth": []
-  }
-]
+```bash
+uv add mini-rag
 ```
+
+## Basic Usage
+
+```python
+import os
+from mini import (
+    AgenticRAG,
+    LLMConfig,
+    RetrievalConfig,
+    EmbeddingModel,
+    VectorStore
+)
+
+# Initialize components
+embedding_model = EmbeddingModel()
+vector_store = VectorStore(
+    uri=os.getenv("MILVUS_URI"),
+    token=os.getenv("MILVUS_TOKEN"),
+    collection_name="my_docs",
+    dimension=1536
+)
+
+# Create RAG instance
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    llm_config=LLMConfig(model="gpt-4o-mini"),
+    retrieval_config=RetrievalConfig(
+        top_k=10,
+        rerank_top_k=3,
+        use_query_rewriting=True,
+        use_reranking=True
+    )
+)
+
+# Index documents
+rag.index_document("document.pdf")
+
+# Query
+response = rag.query("What is this about?")
+print(response.answer)
+```
+
+## Core Concepts
+
+### Configuration-Based API
+
+Mini RAG uses a clean, configuration-based API with four main configuration classes:
+
+- **`LLMConfig`**: Language model settings
+- **`RetrievalConfig`**: Retrieval behavior
+- **`RerankerConfig`**: Reranking strategy
+- **`ObservabilityConfig`**: Monitoring and tracing
+
+### Modular Components
+
+Use individual components or the complete pipeline:
+
+- **`DocumentLoader`**: Multi-format document loading
+- **`Chunker`**: Smart text chunking with Chonkie
+- **`EmbeddingModel`**: OpenAI-compatible embeddings
+- **`VectorStore`**: Milvus vector storage
+- **`AgenticRAG`**: Complete RAG orchestrator
+
+## Import Reference
+
+```python
+# Main classes
+from mini import AgenticRAG, EmbeddingModel, VectorStore
+
+# Configuration
+from mini import (
+    LLMConfig,
+    RetrievalConfig,
+    RerankerConfig,
+    ObservabilityConfig
+)
+
+# Individual components
+from mini.loader import DocumentLoader
+from mini.chunker import Chunker
+from mini.reranker import (
+    CohereReranker,
+    SentenceTransformerReranker,
+    LLMReranker,
+    create_reranker
+)
+```
+
+## Type Hints
+
+Mini RAG is fully typed with Pydantic for validation and IDE support:
+
+```python
+from typing import Optional, List, Dict, Any
+from mini import AgenticRAG, RAGResponse
+
+def process_query(rag: AgenticRAG, question: str) -> RAGResponse:
+    """Type-safe query processing."""
+    response: RAGResponse = rag.query(question)
+    return response
+```
+
+## Error Handling
+
+All methods raise standard Python exceptions:
+
+```python
+from mini import AgenticRAG
+
+try:
+    rag = AgenticRAG(vector_store=store, embedding_model=model)
+    response = rag.query("question")
+except FileNotFoundError:
+    print("Document not found")
+except ValueError:
+    print("Invalid configuration")
+except Exception as e:
+    print(f"Unexpected error: {e}")
+```
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card title="Core Classes" icon="cube" href="/api-reference/agentic-rag">
+    Explore the main classes
+  </Card>
+  <Card title="Configuration" icon="sliders" href="/api-reference/config/llm-config">
+    Learn about configuration options
+  </Card>
+  <Card title="Examples" icon="code" href="/examples/document-qa">
+    See practical examples
+  </Card>
+</CardGroup>

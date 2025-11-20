@@ -1,0 +1,280 @@
+---
+title: "Cohere Reranker"
+description: "Use Cohere's specialized reranking models"
+---
+
+## Overview
+
+Cohere Reranker uses Cohere's specialized models for high-quality document reranking. It provides state-of-the-art relevance scoring.
+
+## Setup
+
+### Install Cohere
+
+Cohere is included with Mini RAG:
+
+```bash
+uv add mini-rag
+```
+
+### Get API Key
+
+1. Sign up at [Cohere](https://cohere.com)
+2. Get your API key from the dashboard
+3. Add to your environment:
+
+```bash
+COHERE_API_KEY=your-cohere-api-key
+```
+
+## Configuration
+
+### Basic Usage
+
+```python
+from mini import AgenticRAG, RerankerConfig
+import os
+
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    reranker_config=RerankerConfig(
+        type="cohere",
+        kwargs={
+            "api_key": os.getenv("COHERE_API_KEY")
+        }
+    )
+)
+```
+
+### Complete Configuration
+
+```python
+reranker_config = RerankerConfig(
+    type="cohere",
+    kwargs={
+        "api_key": os.getenv("COHERE_API_KEY"),
+        "model": "rerank-english-v3.0",
+        "max_chunks_per_doc": None
+    }
+)
+```
+
+## Available Models
+
+<AccordionGroup>
+  <Accordion title="rerank-english-v3.0">
+    **Best for**: English text  
+    **Quality**: Highest  
+    **Speed**: Fast  
+    **Recommended for**: Production English applications
+  </Accordion>
+  
+  <Accordion title="rerank-multilingual-v3.0">
+    **Best for**: Multiple languages  
+    **Quality**: High  
+    **Speed**: Fast  
+    **Recommended for**: International applications
+    
+    Supports: English, French, Spanish, German, Italian, Portuguese, Chinese, Japanese, Korean, Arabic, and more
+  </Accordion>
+  
+  <Accordion title="rerank-english-v2.0">
+    **Best for**: Legacy applications  
+    **Quality**: Good  
+    **Speed**: Fast  
+    **Recommended for**: Existing integrations
+  </Accordion>
+</AccordionGroup>
+
+## Direct Usage
+
+Use the Cohere reranker directly:
+
+```python
+from mini.reranker import CohereReranker
+
+# Initialize
+reranker = CohereReranker(
+    api_key=os.getenv("COHERE_API_KEY"),
+    model="rerank-english-v3.0"
+)
+
+# Rerank documents
+query = "What is machine learning?"
+documents = [
+    "Machine learning is a subset of AI...",
+    "Python is a programming language...",
+    "Deep learning uses neural networks..."
+]
+
+results = reranker.rerank(query, documents, top_k=2)
+
+for result in results:
+    print(f"Score: {result.score:.3f}")
+    print(f"Document: {result.document[:100]}...")
+```
+
+## Complete Example
+
+```python
+import os
+from mini import (
+    AgenticRAG,
+    LLMConfig,
+    RetrievalConfig,
+    RerankerConfig,
+    EmbeddingModel,
+    VectorStore
+)
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Initialize RAG with Cohere reranking
+rag = AgenticRAG(
+    vector_store=VectorStore(
+        uri=os.getenv("MILVUS_URI"),
+        token=os.getenv("MILVUS_TOKEN"),
+        collection_name="documents",
+        dimension=1536
+    ),
+    embedding_model=EmbeddingModel(),
+    llm_config=LLMConfig(model="gpt-4o-mini"),
+    retrieval_config=RetrievalConfig(
+        top_k=10,
+        rerank_top_k=3,
+        use_reranking=True
+    ),
+    reranker_config=RerankerConfig(
+        type="cohere",
+        kwargs={
+            "api_key": os.getenv("COHERE_API_KEY"),
+            "model": "rerank-english-v3.0"
+        }
+    )
+)
+
+# Index and query
+rag.index_document("document.pdf")
+response = rag.query("What is the main topic?")
+
+print(response.answer)
+```
+
+## Pricing
+
+Cohere reranking pricing (as of 2024):
+
+- **Search Units**: Charged per 1000 search units
+- **Search Unit**: 1 query + 1 document to rerank
+- **Example**: 1 query with 10 documents = 10 search units
+
+Typical costs:
+- Free tier: Limited searches
+- Paid: ~$1-2 per 1000 queries (10 docs each)
+
+Check [Cohere Pricing](https://cohere.com/pricing) for current rates.
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Choose the Right Model">
+    - **English only**: Use `rerank-english-v3.0`
+    - **Multiple languages**: Use `rerank-multilingual-v3.0`
+    - **Best quality**: Always use v3.0 models
+  </Accordion>
+  
+  <Accordion title="Optimize top_k">
+    Retrieve more initially, rerank to fewer:
+    
+    ```python
+    RetrievalConfig(
+        top_k=15,        # Cast wide net
+        rerank_top_k=3   # Keep only best
+    )
+    ```
+  </Accordion>
+  
+  <Accordion title="Handle Errors">
+    ```python
+    try:
+        response = rag.query(question)
+    except Exception as e:
+        if "rate_limit" in str(e).lower():
+            # Handle rate limit
+            time.sleep(1)
+            response = rag.query(question)
+        else:
+            raise
+    ```
+  </Accordion>
+  
+  <Accordion title="Monitor Usage">
+    Track API usage in Cohere dashboard to manage costs
+  </Accordion>
+</AccordionGroup>
+
+## Advantages
+
+✅ **Highest Quality**: Best-in-class reranking  
+✅ **Fast**: Low latency (~50-100ms)  
+✅ **Easy Setup**: Simple API integration  
+✅ **Multilingual**: Supports many languages  
+✅ **Maintained**: Continuously improved by Cohere
+
+## Limitations
+
+❌ **Cost**: Requires API subscription  
+❌ **Cloud Only**: Not available for local deployment  
+❌ **API Dependency**: Requires internet connection  
+❌ **Rate Limits**: Subject to API rate limits
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="API Key Error">
+    Ensure your API key is set:
+    ```python
+    import os
+    print(os.getenv("COHERE_API_KEY"))
+    ```
+  </Accordion>
+  
+  <Accordion title="Rate Limit">
+    Implement backoff:
+    ```python
+    from time import sleep
+    
+    for attempt in range(3):
+        try:
+            results = reranker.rerank(query, docs)
+            break
+        except Exception as e:
+            if attempt < 2:
+                sleep(2 ** attempt)
+    ```
+  </Accordion>
+  
+  <Accordion title="Model Not Found">
+    Use correct model names:
+    - `rerank-english-v3.0` ✅
+    - `rerank-multilingual-v3.0` ✅
+    - `rerank-v3` ❌ (incorrect)
+  </Accordion>
+</AccordionGroup>
+
+## See Also
+
+<CardGroup cols={3}>
+  <Card title="Rerankers Overview" href="/api-reference/rerankers/overview">
+    Compare rerankers
+  </Card>
+  <Card title="Reranking Feature" href="/features/reranking">
+    Learn about reranking
+  </Card>
+  <Card title="Cohere Docs" href="https://docs.cohere.com/docs/reranking">
+    Official Cohere docs
+  </Card>
+</CardGroup>
+

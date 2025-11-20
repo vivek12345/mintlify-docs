@@ -1,0 +1,436 @@
+---
+title: "EmbeddingModel"
+description: "Generate embeddings using OpenAI-compatible APIs"
+---
+
+## Overview
+
+`EmbeddingModel` generates vector embeddings from text using OpenAI or any OpenAI-compatible API. It supports custom endpoints for Azure OpenAI, local models, and more.
+
+## Constructor
+
+```python
+from mini.embedding import EmbeddingModel
+
+embedding_model = EmbeddingModel(
+    api_key: Optional[str] = None,
+    base_url: Optional[str] = None,
+    model: Optional[str] = None,
+    dimensions: Optional[int] = None,
+    timeout: float = 60.0,
+    max_retries: int = 3
+)
+```
+
+### Parameters
+
+<ParamField path="api_key" type="str">
+  API key for the embedding service (defaults to `OPENAI_API_KEY` env var)
+</ParamField>
+
+<ParamField path="base_url" type="str">
+  Base URL for the API endpoint (defaults to `OPENAI_BASE_URL` env var or OpenAI's API)
+</ParamField>
+
+<ParamField path="model" type="str">
+  Model identifier (defaults to `EMBEDDING_MODEL` env var or "text-embedding-3-small")
+</ParamField>
+
+<ParamField path="dimensions" type="int">
+  Output dimension for embeddings (if supported by model)
+</ParamField>
+
+<ParamField path="timeout" type="float" default="60.0">
+  Request timeout in seconds
+</ParamField>
+
+<ParamField path="max_retries" type="int" default="3">
+  Maximum number of retry attempts on failure
+</ParamField>
+
+### Examples
+
+#### Using OpenAI
+
+```python
+from mini.embedding import EmbeddingModel
+
+# Uses OPENAI_API_KEY from environment
+embedding_model = EmbeddingModel()
+
+# Or specify explicitly
+embedding_model = EmbeddingModel(
+    api_key="sk-...",
+    model="text-embedding-3-small"
+)
+```
+
+#### Using Azure OpenAI
+
+```python
+embedding_model = EmbeddingModel(
+    api_key="your-azure-key",
+    base_url="https://your-resource.openai.azure.com/openai/deployments/your-deployment",
+    model="text-embedding-ada-002"
+)
+```
+
+#### Using Local Model
+
+```python
+# e.g., llama.cpp, vLLM, or other OpenAI-compatible server
+embedding_model = EmbeddingModel(
+    api_key="not-needed",
+    base_url="http://localhost:8080/v1",
+    model="local-embedding-model"
+)
+```
+
+## Methods
+
+### embed_chunks
+
+Generate embeddings for multiple text chunks.
+
+```python
+def embed_chunks(
+    self,
+    chunks: List[str]
+) -> List[List[float]]
+```
+
+#### Parameters
+
+<ParamField path="chunks" type="List[str]" required>
+  List of text strings to embed
+</ParamField>
+
+#### Returns
+
+<ResponseField name="embeddings" type="List[List[float]]">
+  List of embedding vectors, one per input chunk
+</ResponseField>
+
+#### Example
+
+```python
+from mini.embedding import EmbeddingModel
+
+embedding_model = EmbeddingModel()
+
+# Embed multiple chunks
+chunks = [
+    "This is the first chunk of text.",
+    "This is the second chunk of text.",
+    "This is the third chunk of text."
+]
+
+embeddings = embedding_model.embed_chunks(chunks)
+
+print(f"Generated {len(embeddings)} embeddings")
+print(f"Embedding dimension: {len(embeddings[0])}")
+```
+
+### embed_query
+
+Generate embedding for a single query text.
+
+```python
+def embed_query(
+    self,
+    query: str
+) -> List[float]
+```
+
+#### Parameters
+
+<ParamField path="query" type="str" required>
+  Query text to embed
+</ParamField>
+
+#### Returns
+
+<ResponseField name="embedding" type="List[float]">
+  Embedding vector for the query
+</ResponseField>
+
+#### Example
+
+```python
+from mini.embedding import EmbeddingModel
+
+embedding_model = EmbeddingModel()
+
+# Embed a query
+query = "What is machine learning?"
+embedding = embedding_model.embed_query(query)
+
+print(f"Query embedding dimension: {len(embedding)}")
+```
+
+## Supported Models
+
+### OpenAI Models
+
+<AccordionGroup>
+  <Accordion title="text-embedding-3-small">
+    - **Dimensions**: 1536 (default) or configurable
+    - **Max tokens**: 8191
+    - **Cost**: Low
+    - **Speed**: Fast
+    - **Best for**: Most applications, good balance
+  </Accordion>
+  
+  <Accordion title="text-embedding-3-large">
+    - **Dimensions**: 3072 (default) or configurable
+    - **Max tokens**: 8191
+    - **Cost**: Higher
+    - **Speed**: Moderate
+    - **Best for**: Higher quality requirements
+  </Accordion>
+  
+  <Accordion title="text-embedding-ada-002">
+    - **Dimensions**: 1536 (fixed)
+    - **Max tokens**: 8191
+    - **Cost**: Moderate
+    - **Speed**: Fast
+    - **Best for**: Legacy applications
+  </Accordion>
+</AccordionGroup>
+
+### Custom Dimensions
+
+```python
+# Use custom dimensions (if model supports it)
+embedding_model = EmbeddingModel(
+    model="text-embedding-3-small",
+    dimensions=512  # Smaller for faster search
+)
+```
+
+## Complete Example
+
+```python
+from mini.loader import DocumentLoader
+from mini.chunker import Chunker
+from mini.embedding import EmbeddingModel
+
+# Initialize components
+loader = DocumentLoader()
+chunker = Chunker()
+embedding_model = EmbeddingModel(
+    model="text-embedding-3-small"
+)
+
+# Load and chunk document
+text = loader.load("document.pdf")
+chunks = chunker.chunk(text)
+
+print(f"Processing {len(chunks)} chunks...")
+
+# Generate embeddings
+chunk_texts = [chunk.text for chunk in chunks]
+embeddings = embedding_model.embed_chunks(chunk_texts)
+
+print(f"Generated {len(embeddings)} embeddings")
+print(f"Embedding dimension: {len(embeddings[0])}")
+
+# Embed a query
+query = "What is this document about?"
+query_embedding = embedding_model.embed_query(query)
+
+# Calculate similarity (cosine)
+import numpy as np
+
+def cosine_similarity(a, b):
+    return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+
+# Find most similar chunk
+similarities = [
+    cosine_similarity(query_embedding, emb)
+    for emb in embeddings
+]
+
+best_idx = np.argmax(similarities)
+print(f"\nMost similar chunk ({similarities[best_idx]:.3f}):")
+print(chunks[best_idx].text[:200])
+```
+
+## Error Handling
+
+```python
+from mini.embedding import EmbeddingModel
+
+embedding_model = EmbeddingModel()
+
+try:
+    embeddings = embedding_model.embed_chunks(chunks)
+except Exception as e:
+    print(f"Embedding failed: {e}")
+    # Handle error (retry, log, etc.)
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Batch Processing">
+    Process chunks in batches for efficiency:
+    
+    ```python
+    batch_size = 100
+    all_embeddings = []
+    
+    for i in range(0, len(chunks), batch_size):
+        batch = chunks[i:i + batch_size]
+        embeddings = embedding_model.embed_chunks(batch)
+        all_embeddings.extend(embeddings)
+    ```
+  </Accordion>
+  
+  <Accordion title="Rate Limiting">
+    Respect API rate limits:
+    
+    ```python
+    import time
+    
+    embeddings = []
+    for chunk in chunks:
+        emb = embedding_model.embed_query(chunk)
+        embeddings.append(emb)
+        time.sleep(0.1)  # Avoid rate limits
+    ```
+    
+    Or use `embed_chunks` which handles batching automatically.
+  </Accordion>
+  
+  <Accordion title="Environment Variables">
+    Use environment variables for credentials:
+    
+    ```bash
+    # .env file
+    OPENAI_API_KEY=sk-...
+    EMBEDDING_MODEL=text-embedding-3-small
+    ```
+    
+    ```python
+    # Code
+    from dotenv import load_dotenv
+    load_dotenv()
+    
+    # Automatically uses env vars
+    embedding_model = EmbeddingModel()
+    ```
+  </Accordion>
+  
+  <Accordion title="Dimension Matching">
+    Ensure dimensions match your vector store:
+    
+    ```python
+    # Embedding model
+    embedding_model = EmbeddingModel(
+        model="text-embedding-3-small",
+        dimensions=1536
+    )
+    
+    # Vector store (must match!)
+    vector_store = VectorStore(
+        ...,
+        dimension=1536
+    )
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Performance Tips
+
+<AccordionGroup>
+  <Accordion title="Choose the Right Model">
+    - **text-embedding-3-small**: Best balance for most use cases
+    - **text-embedding-3-large**: Higher quality, slower, more expensive
+    - **Local models**: Best for privacy, requires infrastructure
+  </Accordion>
+  
+  <Accordion title="Optimize Batch Size">
+    Larger batches are more efficient:
+    
+    ```python
+    # Better
+    embeddings = embedding_model.embed_chunks(chunks)  # All at once
+    
+    # Slower
+    embeddings = [
+        embedding_model.embed_query(chunk)
+        for chunk in chunks
+    ]
+    ```
+  </Accordion>
+  
+  <Accordion title="Cache Embeddings">
+    Store embeddings to avoid regenerating:
+    
+    ```python
+    import pickle
+    
+    # Save
+    with open('embeddings.pkl', 'wb') as f:
+        pickle.dump(embeddings, f)
+    
+    # Load
+    with open('embeddings.pkl', 'rb') as f:
+        embeddings = pickle.load(f)
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="API Key Errors">
+    Ensure your API key is set:
+    
+    ```python
+    import os
+    print(os.getenv("OPENAI_API_KEY"))  # Should not be None
+    ```
+  </Accordion>
+  
+  <Accordion title="Dimension Mismatch">
+    Check model dimensions:
+    
+    ```python
+    embedding = embedding_model.embed_query("test")
+    print(f"Dimension: {len(embedding)}")
+    ```
+  </Accordion>
+  
+  <Accordion title="Rate Limit Errors">
+    Handle rate limits gracefully:
+    
+    ```python
+    from time import sleep
+    
+    try:
+        embeddings = embedding_model.embed_chunks(chunks)
+    except Exception as e:
+        if "rate_limit" in str(e).lower():
+            print("Rate limited, waiting...")
+            sleep(60)
+            embeddings = embedding_model.embed_chunks(chunks)
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## See Also
+
+<CardGroup cols={3}>
+  <Card title="Chunker" icon="scissors" href="/api-reference/chunker">
+    Text chunking
+  </Card>
+  <Card title="VectorStore" icon="database" href="/api-reference/vector-store">
+    Store embeddings
+  </Card>
+  <Card title="Embeddings Guide" icon="layer-group" href="/core/embeddings">
+    Learn more
+  </Card>
+</CardGroup>
+

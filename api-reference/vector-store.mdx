@@ -1,0 +1,357 @@
+---
+title: "VectorStore"
+description: "Milvus-powered vector storage and retrieval"
+---
+
+## Overview
+
+`VectorStore` provides vector storage and similarity search using Milvus. It handles collection management, indexing, search, and hybrid search operations.
+
+## Constructor
+
+```python
+from mini.store import VectorStore
+
+vector_store = VectorStore(
+    uri: str,
+    token: str,
+    collection_name: str,
+    dimension: int,
+    metric_type: str = "IP",
+    index_type: str = "IVF_FLAT",
+    nlist: int = 128
+)
+```
+
+### Parameters
+
+<ParamField path="uri" type="str" required>
+  Milvus server URI
+</ParamField>
+
+<ParamField path="token" type="str" required>
+  Authentication token
+</ParamField>
+
+<ParamField path="collection_name" type="str" required>
+  Name of the collection to use or create
+</ParamField>
+
+<ParamField path="dimension" type="int" required>
+  Dimension of embedding vectors
+</ParamField>
+
+<ParamField path="metric_type" type="str" default="IP">
+  Distance metric: "IP" (inner product), "L2", or "COSINE"
+</ParamField>
+
+<ParamField path="index_type" type="str" default="IVF_FLAT">
+  Index algorithm: "IVF_FLAT", "IVF_SQ8", or "HNSW"
+</ParamField>
+
+<ParamField path="nlist" type="int" default="128">
+  Number of cluster units for IVF indexes
+</ParamField>
+
+### Example
+
+```python
+import os
+from mini.store import VectorStore
+
+vector_store = VectorStore(
+    uri=os.getenv("MILVUS_URI"),
+    token=os.getenv("MILVUS_TOKEN"),
+    collection_name="my_documents",
+    dimension=1536,
+    metric_type="IP",
+    index_type="IVF_FLAT"
+)
+```
+
+## Methods
+
+### insert
+
+Insert vectors with their texts and metadata.
+
+```python
+def insert(
+    self,
+    embeddings: List[List[float]],
+    texts: List[str],
+    metadata: Optional[List[Dict[str, Any]]] = None
+) -> List[int]
+```
+
+#### Parameters
+
+<ParamField path="embeddings" type="List[List[float]]" required>
+  List of embedding vectors
+</ParamField>
+
+<ParamField path="texts" type="List[str]" required>
+  List of text strings corresponding to embeddings
+</ParamField>
+
+<ParamField path="metadata" type="List[Dict[str, Any]]">
+  Optional list of metadata dictionaries
+</ParamField>
+
+#### Returns
+
+<ResponseField name="ids" type="List[int]">
+  List of assigned IDs for the inserted vectors
+</ResponseField>
+
+#### Example
+
+```python
+# Insert vectors
+ids = vector_store.insert(
+    embeddings=embeddings,
+    texts=["Text 1", "Text 2", "Text 3"],
+    metadata=[
+        {"source": "doc1.pdf", "page": 1},
+        {"source": "doc1.pdf", "page": 2},
+        {"source": "doc2.pdf", "page": 1}
+    ]
+)
+
+print(f"Inserted {len(ids)} vectors")
+```
+
+### search
+
+Search for similar vectors.
+
+```python
+def search(
+    self,
+    query_embedding: List[float],
+    top_k: int = 5,
+    filter_expr: Optional[str] = None,
+    output_fields: Optional[List[str]] = None
+) -> List[Dict[str, Any]]
+```
+
+#### Parameters
+
+<ParamField path="query_embedding" type="List[float]" required>
+  Query vector
+</ParamField>
+
+<ParamField path="top_k" type="int" default="5">
+  Number of results to return
+</ParamField>
+
+<ParamField path="filter_expr" type="str">
+  Optional filter expression
+</ParamField>
+
+<ParamField path="output_fields" type="List[str]">
+  Fields to return in results
+</ParamField>
+
+#### Returns
+
+<ResponseField name="results" type="List[Dict[str, Any]]">
+  List of search results with scores and metadata
+</ResponseField>
+
+#### Example
+
+```python
+# Search
+results = vector_store.search(
+    query_embedding=query_embedding,
+    top_k=5,
+    filter_expr='metadata["source"] == "doc1.pdf"',
+    output_fields=["text", "metadata"]
+)
+
+for result in results:
+    print(f"Score: {result['score']:.3f}")
+    print(f"Text: {result['text'][:100]}...")
+    print(f"Metadata: {result['metadata']}")
+```
+
+### hybrid_search
+
+Perform hybrid search combining semantic and BM25 keyword search.
+
+```python
+def hybrid_search(
+    self,
+    query: str,
+    query_embedding: List[float],
+    top_k: int = 5,
+    filter_expr: Optional[str] = None,
+    output_fields: Optional[List[str]] = None
+) -> List[Dict[str, Any]]
+```
+
+#### Parameters
+
+<ParamField path="query" type="str" required>
+  Query text for BM25 search
+</ParamField>
+
+<ParamField path="query_embedding" type="List[float]" required>
+  Query vector for semantic search
+</ParamField>
+
+<ParamField path="top_k" type="int" default="5">
+  Number of results to return
+</ParamField>
+
+<ParamField path="filter_expr" type="str">
+  Optional filter expression
+</ParamField>
+
+<ParamField path="output_fields" type="List[str]">
+  Fields to return in results
+</ParamField>
+
+#### Returns
+
+<ResponseField name="results" type="List[Dict[str, Any]]">
+  Combined results using RRF fusion
+</ResponseField>
+
+### count
+
+Get the number of vectors in the collection.
+
+```python
+def count(self) -> int
+```
+
+#### Returns
+
+<ResponseField name="count" type="int">
+  Number of vectors in the collection
+</ResponseField>
+
+#### Example
+
+```python
+count = vector_store.count()
+print(f"Total vectors: {count}")
+```
+
+### delete
+
+Delete vectors matching a filter expression.
+
+```python
+def delete(self, expr: str) -> int
+```
+
+#### Parameters
+
+<ParamField path="expr" type="str" required>
+  Filter expression for deletion
+</ParamField>
+
+#### Returns
+
+<ResponseField name="deleted_count" type="int">
+  Number of vectors deleted
+</ResponseField>
+
+#### Example
+
+```python
+# Delete by metadata
+deleted = vector_store.delete('metadata["source"] == "old_doc.pdf"')
+print(f"Deleted {deleted} vectors")
+```
+
+### drop_collection
+
+Delete the entire collection.
+
+```python
+def drop_collection(self)
+```
+
+**Warning**: This permanently deletes all data in the collection.
+
+### disconnect
+
+Close the connection to Milvus.
+
+```python
+def disconnect(self)
+```
+
+## Complete Example
+
+```python
+import os
+from mini import EmbeddingModel, VectorStore
+
+# Initialize
+embedding_model = EmbeddingModel()
+vector_store = VectorStore(
+    uri=os.getenv("MILVUS_URI"),
+    token=os.getenv("MILVUS_TOKEN"),
+    collection_name="documents",
+    dimension=1536
+)
+
+# Prepare data
+texts = [
+    "Machine learning is a subset of AI.",
+    "Deep learning uses neural networks.",
+    "NLP processes human language."
+]
+
+# Generate embeddings
+embeddings = embedding_model.embed_chunks(texts)
+
+# Insert
+ids = vector_store.insert(
+    embeddings=embeddings,
+    texts=texts,
+    metadata=[
+        {"topic": "ML", "page": 1},
+        {"topic": "DL", "page": 2},
+        {"topic": "NLP", "page": 3}
+    ]
+)
+
+# Search
+query = "What is machine learning?"
+query_embedding = embedding_model.embed_query(query)
+
+results = vector_store.search(
+    query_embedding=query_embedding,
+    top_k=3
+)
+
+for result in results:
+    print(f"{result['score']:.3f}: {result['text']}")
+
+# Get count
+print(f"Total: {vector_store.count()}")
+
+# Cleanup
+vector_store.disconnect()
+```
+
+## See Also
+
+<CardGroup cols={3}>
+  <Card title="EmbeddingModel" icon="layer-group" href="/api-reference/embedding-model">
+    Generate embeddings
+  </Card>
+  <Card title="AgenticRAG" icon="robot" href="/api-reference/agentic-rag">
+    Complete RAG pipeline
+  </Card>
+  <Card title="Hybrid Search" icon="magnifying-glass-plus" href="/features/hybrid-search">
+    Learn about hybrid search
+  </Card>
+</CardGroup>
+

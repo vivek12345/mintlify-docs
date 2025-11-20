@@ -1,0 +1,310 @@
+---
+title: "LLM Reranker"
+description: "Use your LLM for reranking"
+---
+
+## Overview
+
+LLM Reranker uses your configured language model to score and rerank retrieved chunks. It's simple to set up and doesn't require additional APIs.
+
+## Configuration
+
+### Basic Usage
+
+```python
+from mini import AgenticRAG, RerankerConfig
+
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    reranker_config=RerankerConfig(
+        type="llm"  # Uses your configured LLM
+    )
+)
+```
+
+This is the **default** reranker, so you can also omit it:
+
+```python
+# These are equivalent
+rag1 = AgenticRAG(vector_store, embedding_model)
+rag2 = AgenticRAG(
+    vector_store,
+    embedding_model,
+    reranker_config=RerankerConfig(type="llm")
+)
+```
+
+## How It Works
+
+The LLM reranker:
+
+1. Receives the query and retrieved chunks
+2. Asks the LLM to score each chunk's relevance (0-10)
+3. Reranks chunks by score
+4. Returns the top chunks
+
+### Prompt Example
+
+```
+Given the query: "What is machine learning?"
+
+Score the relevance of this document on a scale of 0-10:
+"Machine learning is a subset of artificial intelligence..."
+
+Score: [LLM provides score]
+```
+
+## Direct Usage
+
+```python
+from mini.reranker import LLMReranker
+from openai import OpenAI
+
+# Initialize with OpenAI client
+client = OpenAI(api_key="sk-...")
+reranker = LLMReranker(
+    client=client,
+    model="gpt-4o-mini",
+    temperature=0.3
+)
+
+# Rerank documents
+query = "What is machine learning?"
+documents = [
+    "Machine learning is a subset of AI...",
+    "Python is a programming language...",
+    "Deep learning uses neural networks..."
+]
+
+results = reranker.rerank(query, documents, top_k=2)
+
+for result in results:
+    print(f"Score: {result.score:.3f}")
+    print(f"Document: {result.document[:100]}...")
+```
+
+## Complete Example
+
+```python
+import os
+from mini import (
+    AgenticRAG,
+    LLMConfig,
+    RetrievalConfig,
+    RerankerConfig,
+    EmbeddingModel,
+    VectorStore
+)
+
+# Initialize RAG with LLM reranking
+rag = AgenticRAG(
+    vector_store=VectorStore(
+        uri=os.getenv("MILVUS_URI"),
+        token=os.getenv("MILVUS_TOKEN"),
+        collection_name="documents",
+        dimension=1536
+    ),
+    embedding_model=EmbeddingModel(),
+    llm_config=LLMConfig(
+        model="gpt-4o-mini",
+        temperature=0.7
+    ),
+    retrieval_config=RetrievalConfig(
+        top_k=10,
+        rerank_top_k=3,
+        use_reranking=True
+    ),
+    reranker_config=RerankerConfig(
+        type="llm"
+    )
+)
+
+# Index and query
+rag.index_document("document.pdf")
+response = rag.query("What is the main topic?")
+
+print(response.answer)
+```
+
+## Configuration Options
+
+The LLM reranker can be configured through `LLMConfig`:
+
+```python
+from mini import LLMConfig, RerankerConfig
+
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    llm_config=LLMConfig(
+        model="gpt-4o-mini",
+        temperature=0.3,  # Lower for more consistent scoring
+        timeout=60.0,
+        max_retries=3
+    ),
+    reranker_config=RerankerConfig(type="llm")
+)
+```
+
+## Performance
+
+### Speed
+
+- **Fast LLMs** (gpt-3.5-turbo, gpt-4o-mini): 500-1000ms for 10 chunks
+- **Slower LLMs** (gpt-4): 1000-2000ms for 10 chunks
+- **Local LLMs**: Varies widely (500-5000ms)
+
+### Cost
+
+Depends on your LLM pricing and number of chunks:
+
+```python
+# Example: GPT-4o-mini
+# - 10 chunks × ~200 tokens each = ~2000 tokens input
+# - ~100 tokens output for scores
+# - Total: ~2100 tokens per reranking operation
+```
+
+### Quality
+
+- **GPT-4**: Excellent (comparable to Cohere)
+- **GPT-4o-mini**: Very Good
+- **GPT-3.5-turbo**: Good
+- **Local models**: Varies
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use Lower Temperature">
+    Consistent scoring requires lower temperature:
+    
+    ```python
+    LLMConfig(
+        model="gpt-4o-mini",
+        temperature=0.3  # Lower = more consistent
+    )
+    ```
+  </Accordion>
+  
+  <Accordion title="Fast LLMs for Reranking">
+    Use faster models for reranking:
+    
+    ```python
+    # Fast reranking
+    llm_config = LLMConfig(model="gpt-4o-mini")
+    
+    # Can still use GPT-4 for answer generation
+    # (Mini RAG handles this automatically)
+    ```
+  </Accordion>
+  
+  <Accordion title="Chunk Truncation">
+    Long chunks are automatically truncated to save tokens:
+    
+    ```python
+    # LLMReranker truncates to ~500 chars by default
+    reranker = LLMReranker(
+        client=client,
+        truncate_length=500  # Adjust if needed
+    )
+    ```
+  </Accordion>
+  
+  <Accordion title="Balance top_k">
+    More chunks = more LLM tokens:
+    
+    ```python
+    # Efficient
+    RetrievalConfig(top_k=10, rerank_top_k=3)
+    
+    # More expensive
+    RetrievalConfig(top_k=20, rerank_top_k=5)
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Advantages
+
+✅ **Simple Setup**: No additional APIs needed  
+✅ **Uses Existing LLM**: Leverages your configured model  
+✅ **Good Quality**: Especially with GPT-4/4o  
+✅ **Flexible**: Works with any OpenAI-compatible API
+
+## Limitations
+
+❌ **Token Cost**: Uses LLM tokens for each reranking  
+❌ **Latency**: Slower than specialized rerankers  
+❌ **Consistency**: Scoring can vary between runs  
+❌ **Not Optimized**: General LLM vs specialized reranker
+
+## When to Use
+
+Use LLM reranker when:
+
+- ✅ You're already using a good LLM (GPT-4, GPT-4o-mini)
+- ✅ You want simple setup with no extra APIs
+- ✅ You don't need the absolute fastest reranking
+- ✅ Token cost is acceptable
+
+Consider alternatives when:
+
+- ❌ You need maximum quality → Use Cohere
+- ❌ You need maximum speed → Use Sentence Transformer with GPU
+- ❌ You want to minimize LLM costs → Use Sentence Transformer
+- ❌ You need local/private → Use Sentence Transformer
+
+## Comparison with Other Rerankers
+
+| Feature | LLM | Cohere | Sentence Transformer |
+|---------|-----|---------|---------------------|
+| **Quality** | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ |
+| **Speed** | ⚡⚡ | ⚡⚡⚡ | ⚡⚡⚡⚡ |
+| **Setup** | ✅ Easy | ✅ Easy | ⚠️ Moderate |
+| **Cost** | 💰💰 LLM tokens | 💰💰 API | 💰 Free |
+| **Privacy** | ☁️ Cloud | ☁️ Cloud | 🔒 Local |
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Inconsistent Scores">
+    Lower the temperature:
+    ```python
+    LLMConfig(temperature=0.1)
+    ```
+  </Accordion>
+  
+  <Accordion title="Too Slow">
+    Use a faster model:
+    ```python
+    LLMConfig(model="gpt-3.5-turbo")  # Faster
+    ```
+    
+    Or reduce chunks:
+    ```python
+    RetrievalConfig(top_k=5)  # Fewer chunks to rerank
+    ```
+  </Accordion>
+  
+  <Accordion title="High Costs">
+    Consider alternatives:
+    - Sentence Transformer (local, free)
+    - Reduce `top_k` to rerank fewer chunks
+    - Use LLM reranking selectively
+  </Accordion>
+</AccordionGroup>
+
+## See Also
+
+<CardGroup cols={3}>
+  <Card title="Rerankers Overview" href="/api-reference/rerankers/overview">
+    Compare rerankers
+  </Card>
+  <Card title="Cohere Reranker" href="/api-reference/rerankers/cohere">
+    Higher quality option
+  </Card>
+  <Card title="Sentence Transformer" href="/api-reference/rerankers/sentence-transformer">
+    Local option
+  </Card>
+</CardGroup>
+

@@ -1,0 +1,203 @@
+---
+title: "RerankerConfig"
+description: "Configure the reranking strategy"
+---
+
+## Overview
+
+`RerankerConfig` specifies which reranking strategy to use and how to configure it.
+
+## Definition
+
+```python
+from dataclasses import dataclass, field
+from typing import Dict, Any, Optional
+
+@dataclass
+class RerankerConfig:
+    """Configuration for reranker."""
+    type: str = "llm"
+    custom_reranker: Optional[BaseReranker] = None
+    kwargs: Dict[str, Any] = field(default_factory=dict)
+```
+
+## Fields
+
+<ParamField path="type" type="str" default="llm">
+  Reranker type: "llm", "cohere", "sentence-transformer", or "none"
+</ParamField>
+
+<ParamField path="custom_reranker" type="Optional[BaseReranker]" default="None">
+  Custom reranker instance (overrides `type` if provided)
+</ParamField>
+
+<ParamField path="kwargs" type="Dict[str, Any]" default="{}">
+  Additional keyword arguments for the reranker
+</ParamField>
+
+## Reranker Types
+
+### LLM-based (Default)
+
+Uses your configured LLM to score and rerank chunks:
+
+```python
+from mini import RerankerConfig
+
+reranker_config = RerankerConfig(
+    type="llm"
+)
+```
+
+**Pros**: No additional API required, uses existing LLM  
+**Cons**: Uses LLM tokens
+
+### Cohere
+
+Uses Cohere's specialized reranking models:
+
+```python
+import os
+from mini import RerankerConfig
+
+reranker_config = RerankerConfig(
+    type="cohere",
+    kwargs={
+        "api_key": os.getenv("COHERE_API_KEY"),
+        "model": "rerank-english-v3.0"
+    }
+)
+```
+
+**Pros**: Highest quality, specialized for reranking  
+**Cons**: Requires Cohere API key, additional cost
+
+### Sentence Transformer
+
+Uses local cross-encoder models:
+
+```python
+from mini import RerankerConfig
+
+reranker_config = RerankerConfig(
+    type="sentence-transformer",
+    kwargs={
+        "model_name": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+        "device": "cuda"  # or "cpu"
+    }
+)
+```
+
+**Pros**: Local, private, no API calls  
+**Cons**: Requires model download, GPU recommended
+
+### Disable Reranking
+
+```python
+from mini import RerankerConfig
+
+reranker_config = RerankerConfig(
+    type="none"
+)
+```
+
+**Pros**: Fastest  
+**Cons**: Lower quality results
+
+## Complete Configurations
+
+### Production (Cohere)
+
+```python
+reranker_config = RerankerConfig(
+    type="cohere",
+    kwargs={
+        "api_key": os.getenv("COHERE_API_KEY"),
+        "model": "rerank-english-v3.0",
+        "max_chunks_per_doc": None
+    }
+)
+```
+
+### Local/Private (Sentence Transformer)
+
+```python
+reranker_config = RerankerConfig(
+    type="sentence-transformer",
+    kwargs={
+        "model_name": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+        "device": "cuda"
+    }
+)
+```
+
+### Simple (LLM-based)
+
+```python
+reranker_config = RerankerConfig(
+    type="llm"
+)
+```
+
+### Custom Reranker
+
+```python
+from mini.reranker import CohereReranker
+
+custom_reranker = CohereReranker(
+    api_key="your-key",
+    model="rerank-multilingual-v3.0"
+)
+
+reranker_config = RerankerConfig(
+    custom_reranker=custom_reranker
+)
+```
+
+## Usage Example
+
+```python
+from mini import AgenticRAG, LLMConfig, RetrievalConfig, RerankerConfig
+
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    llm_config=LLMConfig(model="gpt-4o-mini"),
+    retrieval_config=RetrievalConfig(
+        top_k=10,
+        rerank_top_k=3,
+        use_reranking=True
+    ),
+    reranker_config=RerankerConfig(
+        type="cohere",
+        kwargs={
+            "api_key": os.getenv("COHERE_API_KEY"),
+            "model": "rerank-english-v3.0"
+        }
+    )
+)
+```
+
+## Comparison
+
+| Reranker | Quality | Speed | Cost | Privacy |
+|----------|---------|-------|------|---------|
+| **Cohere** | ⭐⭐⭐⭐⭐ | ⚡⚡⚡ | 💰💰 | ☁️ |
+| **LLM** | ⭐⭐⭐⭐ | ⚡⚡ | 💰💰 | ☁️ |
+| **Sentence Transformer** | ⭐⭐⭐ | ⚡⚡⚡⚡ | 💰 | 🔒 |
+| **None** | ⭐⭐ | ⚡⚡⚡⚡⚡ | 💰 | - |
+
+## See Also
+
+<CardGroup cols={3}>
+  <Card title="Rerankers Overview" href="/api-reference/rerankers/overview">
+    Learn about reranking
+  </Card>
+  <Card title="Cohere Reranker" href="/api-reference/rerankers/cohere">
+    Cohere API details
+  </Card>
+  <Card title="Reranking Feature" href="/features/reranking">
+    Reranking guide
+  </Card>
+</CardGroup>
+

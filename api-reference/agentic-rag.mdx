@@ -1,0 +1,412 @@
+---
+title: "AgenticRAG"
+description: "Main orchestrator class for the RAG pipeline"
+---
+
+## Overview
+
+`AgenticRAG` is the main class that orchestrates the complete RAG pipeline. It handles document indexing, query processing, retrieval, reranking, and answer generation.
+
+## Constructor
+
+```python
+class AgenticRAG:
+    def __init__(
+        self,
+        vector_store: VectorStore,
+        embedding_model: EmbeddingModel,
+        llm_config: Optional[LLMConfig] = None,
+        retrieval_config: Optional[RetrievalConfig] = None,
+        reranker_config: Optional[RerankerConfig] = None,
+        observability_config: Optional[ObservabilityConfig] = None
+    )
+```
+
+### Parameters
+
+<ParamField path="vector_store" type="VectorStore" required>
+  Vector store instance for document storage and retrieval
+</ParamField>
+
+<ParamField path="embedding_model" type="EmbeddingModel" required>
+  Embedding model for generating vector representations
+</ParamField>
+
+<ParamField path="llm_config" type="LLMConfig" default="LLMConfig()">
+  Configuration for the language model
+</ParamField>
+
+<ParamField path="retrieval_config" type="RetrievalConfig" default="RetrievalConfig()">
+  Configuration for retrieval behavior
+</ParamField>
+
+<ParamField path="reranker_config" type="RerankerConfig" default="RerankerConfig()">
+  Configuration for reranking strategy
+</ParamField>
+
+<ParamField path="observability_config" type="ObservabilityConfig" default="ObservabilityConfig()">
+  Configuration for observability and monitoring
+</ParamField>
+
+### Example
+
+```python
+import os
+from mini import (
+    AgenticRAG,
+    LLMConfig,
+    RetrievalConfig,
+    EmbeddingModel,
+    VectorStore
+)
+
+# Initialize components
+embedding_model = EmbeddingModel()
+vector_store = VectorStore(
+    uri=os.getenv("MILVUS_URI"),
+    token=os.getenv("MILVUS_TOKEN"),
+    collection_name="documents",
+    dimension=1536
+)
+
+# Create RAG instance
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    llm_config=LLMConfig(
+        model="gpt-4o-mini",
+        temperature=0.7
+    ),
+    retrieval_config=RetrievalConfig(
+        top_k=10,
+        rerank_top_k=3,
+        use_query_rewriting=True,
+        use_reranking=True
+    )
+)
+```
+
+## Methods
+
+### query
+
+Query the RAG system and get an answer.
+
+```python
+def query(
+    self,
+    query: str,
+    top_k: Optional[int] = None,
+    rerank_top_k: Optional[int] = None,
+    return_sources: bool = True
+) -> RAGResponse
+```
+
+#### Parameters
+
+<ParamField path="query" type="str" required>
+  The question to ask
+</ParamField>
+
+<ParamField path="top_k" type="int">
+  Number of chunks to retrieve (overrides config default)
+</ParamField>
+
+<ParamField path="rerank_top_k" type="int">
+  Number of chunks to keep after reranking (overrides config default)
+</ParamField>
+
+<ParamField path="return_sources" type="bool" default="True">
+  Whether to return source chunks
+</ParamField>
+
+#### Returns
+
+<ResponseField name="RAGResponse" type="object">
+  <Expandable title="Response Fields">
+    <ResponseField name="answer" type="str">
+      The generated answer
+    </ResponseField>
+    <ResponseField name="retrieved_chunks" type="List[Chunk]">
+      List of retrieved source chunks
+    </ResponseField>
+    <ResponseField name="original_query" type="str">
+      The original query string
+    </ResponseField>
+    <ResponseField name="rewritten_queries" type="List[str]">
+      Query variations (if query rewriting enabled)
+    </ResponseField>
+    <ResponseField name="metadata" type="Dict[str, Any]">
+      Additional metadata about the query
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+#### Example
+
+```python
+# Basic query
+response = rag.query("What is the budget for education?")
+print(response.answer)
+
+# With custom parameters
+response = rag.query(
+    query="What are the key findings?",
+    top_k=15,
+    rerank_top_k=5,
+    return_sources=True
+)
+
+# Access response details
+print(f"Answer: {response.answer}")
+print(f"Sources: {len(response.retrieved_chunks)}")
+print(f"Query variations: {response.rewritten_queries}")
+```
+
+### index_document
+
+Index a single document into the vector store.
+
+```python
+def index_document(
+    self,
+    document_path: str,
+    metadata: Optional[Dict[str, Any]] = None
+) -> int
+```
+
+#### Parameters
+
+<ParamField path="document_path" type="str" required>
+  Path to the document file
+</ParamField>
+
+<ParamField path="metadata" type="Dict[str, Any]">
+  Optional metadata to attach to all chunks from this document
+</ParamField>
+
+#### Returns
+
+<ResponseField name="num_chunks" type="int">
+  Number of chunks created and indexed
+</ResponseField>
+
+#### Example
+
+```python
+# Basic indexing
+num_chunks = rag.index_document("document.pdf")
+print(f"Indexed {num_chunks} chunks")
+
+# With metadata
+num_chunks = rag.index_document(
+    "research_paper.pdf",
+    metadata={
+        "category": "research",
+        "year": 2024,
+        "author": "John Doe",
+        "department": "AI Research"
+    }
+)
+```
+
+### index_documents
+
+Index multiple documents at once.
+
+```python
+def index_documents(
+    self,
+    document_paths: List[str],
+    metadata: Optional[Dict[str, Any]] = None
+) -> int
+```
+
+#### Parameters
+
+<ParamField path="document_paths" type="List[str]" required>
+  List of paths to document files
+</ParamField>
+
+<ParamField path="metadata" type="Dict[str, Any]">
+  Optional metadata to attach to all chunks from all documents
+</ParamField>
+
+#### Returns
+
+<ResponseField name="total_chunks" type="int">
+  Total number of chunks indexed across all documents
+</ResponseField>
+
+#### Example
+
+```python
+documents = [
+    "doc1.pdf",
+    "doc2.docx",
+    "doc3.txt"
+]
+
+total_chunks = rag.index_documents(documents)
+print(f"Indexed {total_chunks} chunks from {len(documents)} documents")
+```
+
+### get_stats
+
+Get statistics about the RAG system.
+
+```python
+def get_stats(self) -> Dict[str, Any]
+```
+
+#### Returns
+
+<ResponseField name="stats" type="Dict[str, Any]">
+  <Expandable title="Stats Fields">
+    <ResponseField name="total_documents" type="int">
+      Total number of chunks in the vector store
+    </ResponseField>
+    <ResponseField name="collection_name" type="str">
+      Name of the Milvus collection
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+#### Example
+
+```python
+stats = rag.get_stats()
+print(f"Total chunks: {stats['total_documents']}")
+print(f"Collection: {stats['collection_name']}")
+```
+
+## RAGResponse
+
+The response object returned by the `query` method.
+
+### Attributes
+
+<ResponseField name="answer" type="str">
+  The generated answer to the query
+</ResponseField>
+
+<ResponseField name="retrieved_chunks" type="List[Chunk]">
+  List of source chunks used to generate the answer
+</ResponseField>
+
+<ResponseField name="original_query" type="str">
+  The original query string
+</ResponseField>
+
+<ResponseField name="rewritten_queries" type="List[str]">
+  Query variations generated by query rewriting (if enabled)
+</ResponseField>
+
+<ResponseField name="metadata" type="Dict[str, Any]">
+  Additional metadata about the query execution
+</ResponseField>
+
+### Example
+
+```python
+response = rag.query("What is the main topic?")
+
+# Access answer
+print(response.answer)
+
+# Access sources
+for chunk in response.retrieved_chunks:
+    print(f"Score: {chunk.reranked_score or chunk.score}")
+    print(f"Text: {chunk.text[:100]}...")
+    print(f"Metadata: {chunk.metadata}")
+
+# Access query variations
+print(f"Original: {response.original_query}")
+print(f"Variations: {response.rewritten_queries}")
+```
+
+## Complete Example
+
+```python
+import os
+from mini import (
+    AgenticRAG,
+    LLMConfig,
+    RetrievalConfig,
+    RerankerConfig,
+    ObservabilityConfig,
+    EmbeddingModel,
+    VectorStore
+)
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Initialize components
+embedding_model = EmbeddingModel()
+vector_store = VectorStore(
+    uri=os.getenv("MILVUS_URI"),
+    token=os.getenv("MILVUS_TOKEN"),
+    collection_name="knowledge_base",
+    dimension=1536
+)
+
+# Create RAG with all configurations
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    llm_config=LLMConfig(
+        model="gpt-4o-mini",
+        temperature=0.7,
+        timeout=60.0
+    ),
+    retrieval_config=RetrievalConfig(
+        top_k=10,
+        rerank_top_k=3,
+        use_query_rewriting=True,
+        use_reranking=True,
+        use_hybrid_search=True
+    ),
+    reranker_config=RerankerConfig(
+        type="cohere",
+        kwargs={"model": "rerank-english-v3.0"}
+    ),
+    observability_config=ObservabilityConfig(
+        enabled=True
+    )
+)
+
+# Index documents
+documents = ["doc1.pdf", "doc2.pdf", "doc3.pdf"]
+total_chunks = rag.index_documents(documents)
+print(f"Indexed {total_chunks} chunks")
+
+# Query the system
+response = rag.query(
+    "What are the key findings?",
+    top_k=15,
+    rerank_top_k=5
+)
+
+print(f"Answer: {response.answer}")
+print(f"Used {len(response.retrieved_chunks)} sources")
+
+# Get statistics
+stats = rag.get_stats()
+print(f"Total chunks: {stats['total_documents']}")
+```
+
+## See Also
+
+<CardGroup cols={3}>
+  <Card title="LLMConfig" icon="brain" href="/api-reference/config/llm-config">
+    Configure language model
+  </Card>
+  <Card title="RetrievalConfig" icon="magnifying-glass" href="/api-reference/config/retrieval-config">
+    Configure retrieval
+  </Card>
+  <Card title="Vector Store" icon="database" href="/api-reference/vector-store">
+    Vector storage API
+  </Card>
+</CardGroup>
+

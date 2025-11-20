@@ -1,0 +1,201 @@
+---
+title: "LLMConfig"
+description: "Configure the language model for answer generation"
+---
+
+## Overview
+
+`LLMConfig` is a dataclass that configures the language model used for query rewriting and answer generation in the RAG pipeline.
+
+## Definition
+
+```python
+from dataclasses import dataclass
+from typing import Optional
+
+@dataclass
+class LLMConfig:
+    """Configuration for LLM settings."""
+    model: str = "gpt-4"
+    api_key: Optional[str] = None
+    base_url: Optional[str] = None
+    temperature: float = 0.7
+    timeout: float = 60.0
+    max_retries: int = 3
+```
+
+## Fields
+
+<ParamField path="model" type="str" default="gpt-4">
+  Model identifier (e.g., "gpt-4o-mini", "gpt-4", "gpt-3.5-turbo")
+</ParamField>
+
+<ParamField path="api_key" type="Optional[str]" default="None">
+  API key for the LLM service (defaults to OPENAI_API_KEY env var)
+</ParamField>
+
+<ParamField path="base_url" type="Optional[str]" default="None">
+  Custom API endpoint (defaults to OPENAI_BASE_URL env var or OpenAI's API)
+</ParamField>
+
+<ParamField path="temperature" type="float" default="0.7">
+  Sampling temperature (0.0-2.0). Lower = more focused, higher = more creative
+</ParamField>
+
+<ParamField path="timeout" type="float" default="60.0">
+  Request timeout in seconds
+</ParamField>
+
+<ParamField path="max_retries" type="int" default="3">
+  Maximum number of retry attempts on failure
+</ParamField>
+
+## Usage
+
+### Basic Usage
+
+```python
+from mini import AgenticRAG, LLMConfig, EmbeddingModel, VectorStore
+
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    llm_config=LLMConfig(
+        model="gpt-4o-mini"
+    )
+)
+```
+
+### Complete Configuration
+
+```python
+llm_config = LLMConfig(
+    model="gpt-4o-mini",
+    api_key="sk-...",  # Or use env var
+    base_url="https://api.openai.com/v1",
+    temperature=0.7,
+    timeout=120.0,
+    max_retries=5
+)
+
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    llm_config=llm_config
+)
+```
+
+## Common Configurations
+
+### OpenAI
+
+```python
+# GPT-4o Mini (recommended)
+llm_config = LLMConfig(
+    model="gpt-4o-mini",
+    temperature=0.7
+)
+
+# GPT-4
+llm_config = LLMConfig(
+    model="gpt-4",
+    temperature=0.5
+)
+
+# GPT-3.5 Turbo
+llm_config = LLMConfig(
+    model="gpt-3.5-turbo",
+    temperature=0.7
+)
+```
+
+### Azure OpenAI
+
+```python
+llm_config = LLMConfig(
+    model="gpt-4",
+    api_key="your-azure-key",
+    base_url="https://your-resource.openai.azure.com/openai/deployments/your-deployment"
+)
+```
+
+### OpenAI-Compatible APIs
+
+```python
+# Local model (llama.cpp, vLLM, etc.)
+llm_config = LLMConfig(
+    model="mistral-7b",
+    api_key="not-needed",
+    base_url="http://localhost:8080/v1",
+    temperature=0.5
+)
+```
+
+## Temperature Guidelines
+
+The `temperature` parameter controls randomness:
+
+- **0.0-0.3**: Focused, deterministic answers (good for factual Q&A)
+- **0.4-0.7**: Balanced creativity and consistency (default)
+- **0.8-1.0**: More creative, varied responses
+- **>1.0**: Highly creative but potentially less consistent
+
+```python
+# For factual Q&A
+llm_config = LLMConfig(temperature=0.3)
+
+# For creative tasks
+llm_config = LLMConfig(temperature=0.9)
+```
+
+## Timeout and Retries
+
+Configure robustness for production:
+
+```python
+llm_config = LLMConfig(
+    model="gpt-4o-mini",
+    timeout=30.0,      # Faster timeout
+    max_retries=2      # Fewer retries for speed
+)
+
+# For slower models or unreliable connections
+llm_config = LLMConfig(
+    model="gpt-4",
+    timeout=180.0,     # Longer timeout
+    max_retries=5      # More retries
+)
+```
+
+## Default Behavior
+
+If you don't provide an `LLMConfig`, Mini RAG uses defaults:
+
+```python
+# These are equivalent
+rag1 = AgenticRAG(vector_store, embedding_model)
+rag2 = AgenticRAG(vector_store, embedding_model, llm_config=LLMConfig())
+```
+
+Default values:
+- Model: "gpt-4"
+- API key: From `OPENAI_API_KEY` env var
+- Base URL: From `OPENAI_BASE_URL` env var or OpenAI default
+- Temperature: 0.7
+- Timeout: 60 seconds
+- Max retries: 3
+
+## See Also
+
+<CardGroup cols={3}>
+  <Card title="RetrievalConfig" href="/api-reference/config/retrieval-config">
+    Configure retrieval
+  </Card>
+  <Card title="RerankerConfig" href="/api-reference/config/reranker-config">
+    Configure reranking
+  </Card>
+  <Card title="AgenticRAG" href="/api-reference/agentic-rag">
+    Main RAG class
+  </Card>
+</CardGroup>
+

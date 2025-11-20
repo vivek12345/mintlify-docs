@@ -1,0 +1,302 @@
+---
+title: "DocumentLoader"
+description: "Load documents from multiple file formats"
+---
+
+## Overview
+
+`DocumentLoader` handles loading documents from various file formats using Microsoft's MarkItDown library. It supports PDFs, Word documents, images with OCR, and more.
+
+## Constructor
+
+```python
+from mini.loader import DocumentLoader
+
+loader = DocumentLoader()
+```
+
+The DocumentLoader requires no configuration and is ready to use immediately.
+
+## Methods
+
+### load
+
+Load a single document and return its text content.
+
+```python
+def load(self, document_path: str) -> str
+```
+
+#### Parameters
+
+<ParamField path="document_path" type="str" required>
+  Path to the document file
+</ParamField>
+
+#### Returns
+
+<ResponseField name="text" type="str">
+  The extracted text content from the document
+</ResponseField>
+
+#### Example
+
+```python
+from mini.loader import DocumentLoader
+
+loader = DocumentLoader()
+
+# Load a PDF
+text = loader.load("document.pdf")
+print(f"Loaded {len(text)} characters")
+
+# Load a Word document
+text = loader.load("document.docx")
+
+# Load an image with OCR
+text = loader.load("screenshot.png")
+```
+
+### load_documents
+
+Load multiple documents and return a list of their text contents.
+
+```python
+def load_documents(self, document_paths: List[str]) -> List[str]
+```
+
+#### Parameters
+
+<ParamField path="document_paths" type="List[str]" required>
+  List of paths to document files
+</ParamField>
+
+#### Returns
+
+<ResponseField name="texts" type="List[str]">
+  List of extracted text contents, one per document
+</ResponseField>
+
+#### Example
+
+```python
+from mini.loader import DocumentLoader
+
+loader = DocumentLoader()
+
+documents = [
+    "doc1.pdf",
+    "doc2.docx",
+    "doc3.txt"
+]
+
+texts = loader.load_documents(documents)
+print(f"Loaded {len(texts)} documents")
+
+for i, text in enumerate(texts):
+    print(f"Document {i+1}: {len(text)} characters")
+```
+
+### load_documents_from_directory
+
+Load all supported documents from a directory.
+
+```python
+def load_documents_from_directory(
+    self,
+    directory_path: str
+) -> List[str]
+```
+
+#### Parameters
+
+<ParamField path="directory_path" type="str" required>
+  Path to the directory containing documents
+</ParamField>
+
+#### Returns
+
+<ResponseField name="texts" type="List[str]">
+  List of extracted text contents from all supported files in the directory
+</ResponseField>
+
+#### Example
+
+```python
+from mini.loader import DocumentLoader
+
+loader = DocumentLoader()
+
+# Load all documents from a directory
+texts = loader.load_documents_from_directory("./documents/")
+print(f"Loaded {len(texts)} documents from directory")
+```
+
+## Supported Formats
+
+The DocumentLoader supports the following file formats through MarkItDown:
+
+<AccordionGroup>
+  <Accordion title="Document Formats">
+    - **PDF** (`.pdf`) - Text extraction with layout preservation
+    - **Word** (`.docx`, `.doc`) - Microsoft Word documents
+    - **PowerPoint** (`.pptx`, `.ppt`) - Presentation slides
+    - **Excel** (`.xlsx`, `.xls`) - Spreadsheets
+    - **Text** (`.txt`, `.md`) - Plain text and Markdown
+    - **HTML** (`.html`, `.htm`) - Web pages
+  </Accordion>
+  
+  <Accordion title="Image Formats (with OCR)">
+    - **PNG** (`.png`)
+    - **JPEG** (`.jpg`, `.jpeg`)
+    - **GIF** (`.gif`)
+    - **BMP** (`.bmp`)
+    - **TIFF** (`.tiff`, `.tif`)
+  </Accordion>
+  
+  <Accordion title="Code & Data">
+    - **CSV** (`.csv`) - Comma-separated values
+    - **JSON** (`.json`) - JSON data files
+    - **XML** (`.xml`) - XML documents
+    - **YAML** (`.yaml`, `.yml`) - YAML configuration
+  </Accordion>
+</AccordionGroup>
+
+## Error Handling
+
+```python
+from mini.loader import DocumentLoader
+
+loader = DocumentLoader()
+
+try:
+    text = loader.load("document.pdf")
+except FileNotFoundError:
+    print("Document not found")
+except Exception as e:
+    print(f"Error loading document: {e}")
+```
+
+## Complete Example
+
+```python
+from mini.loader import DocumentLoader
+from pathlib import Path
+
+# Initialize loader
+loader = DocumentLoader()
+
+# Load different file types
+pdf_text = loader.load("research_paper.pdf")
+docx_text = loader.load("report.docx")
+img_text = loader.load("screenshot.png")  # OCR
+
+print(f"PDF: {len(pdf_text)} chars")
+print(f"DOCX: {len(docx_text)} chars")
+print(f"Image: {len(img_text)} chars")
+
+# Batch load from directory
+docs_dir = Path("./documents")
+all_texts = loader.load_documents_from_directory(str(docs_dir))
+
+print(f"\nLoaded {len(all_texts)} documents from directory")
+
+# Process loaded texts
+for i, text in enumerate(all_texts):
+    if len(text) > 100:
+        print(f"Doc {i+1}: {text[:100]}...")
+```
+
+## Integration Example
+
+Using DocumentLoader with other Mini RAG components:
+
+```python
+from mini.loader import DocumentLoader
+from mini.chunker import Chunker
+from mini.embedding import EmbeddingModel
+
+# Initialize components
+loader = DocumentLoader()
+chunker = Chunker()
+embedding_model = EmbeddingModel()
+
+# Load document
+text = loader.load("document.pdf")
+
+# Chunk text
+chunks = chunker.chunk(text)
+print(f"Created {len(chunks)} chunks")
+
+# Generate embeddings
+embeddings = embedding_model.embed_chunks([c.text for c in chunks])
+print(f"Generated {len(embeddings)} embeddings")
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Error Handling">
+    Always wrap load operations in try-except blocks:
+    
+    ```python
+    documents = ["doc1.pdf", "doc2.pdf", "doc3.pdf"]
+    loaded = []
+    
+    for doc in documents:
+        try:
+            text = loader.load(doc)
+            loaded.append(text)
+        except Exception as e:
+            print(f"Failed to load {doc}: {e}")
+    ```
+  </Accordion>
+  
+  <Accordion title="Large Files">
+    For large files, consider chunking during or after loading:
+    
+    ```python
+    # Load large document
+    text = loader.load("large_document.pdf")
+    
+    # Chunk immediately
+    chunks = chunker.chunk(text)
+    
+    # Process in batches
+    batch_size = 100
+    for i in range(0, len(chunks), batch_size):
+        batch = chunks[i:i + batch_size]
+        # Process batch
+    ```
+  </Accordion>
+  
+  <Accordion title="Memory Management">
+    Clear large text objects after processing:
+    
+    ```python
+    import gc
+    
+    text = loader.load("huge_document.pdf")
+    chunks = chunker.chunk(text)
+    
+    # Clear large text from memory
+    del text
+    gc.collect()
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## See Also
+
+<CardGroup cols={3}>
+  <Card title="Chunker" icon="scissors" href="/api-reference/chunker">
+    Chunk loaded text
+  </Card>
+  <Card title="Document Loading" icon="file" href="/core/document-loading">
+    Learn more about document loading
+  </Card>
+  <Card title="AgenticRAG" icon="robot" href="/api-reference/agentic-rag">
+    Complete RAG pipeline
+  </Card>
+</CardGroup>
+

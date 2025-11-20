@@ -1,0 +1,268 @@
+---
+title: "RetrievalConfig"
+description: "Configure retrieval behavior and search strategy"
+---
+
+## Overview
+
+`RetrievalConfig` controls how documents are retrieved and processed during the RAG query pipeline.
+
+## Definition
+
+```python
+from dataclasses import dataclass
+
+@dataclass
+class RetrievalConfig:
+    """Configuration for retrieval settings."""
+    top_k: int = 5
+    rerank_top_k: int = 3
+    use_query_rewriting: bool = True
+    use_reranking: bool = True
+    use_hybrid_search: bool = False
+    rrf_k: int = 60
+```
+
+## Fields
+
+<ParamField path="top_k" type="int" default="5">
+  Number of chunks to retrieve initially from the vector store
+</ParamField>
+
+<ParamField path="rerank_top_k" type="int" default="3">
+  Number of chunks to keep after reranking
+</ParamField>
+
+<ParamField path="use_query_rewriting" type="bool" default="True">
+  Whether to generate query variations for better retrieval
+</ParamField>
+
+<ParamField path="use_reranking" type="bool" default="True">
+  Whether to rerank retrieved chunks for relevance
+</ParamField>
+
+<ParamField path="use_hybrid_search" type="bool" default="False">
+  Whether to use hybrid search (semantic + BM25 keyword search)
+</ParamField>
+
+<ParamField path="rrf_k" type="int" default="60">
+  RRF (Reciprocal Rank Fusion) constant for hybrid search result combination
+</ParamField>
+
+## Usage
+
+### Basic Usage
+
+```python
+from mini import AgenticRAG, RetrievalConfig
+
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    retrieval_config=RetrievalConfig(
+        top_k=10,
+        rerank_top_k=3
+    )
+)
+```
+
+### Complete Configuration
+
+```python
+retrieval_config = RetrievalConfig(
+    top_k=15,
+    rerank_top_k=5,
+    use_query_rewriting=True,
+    use_reranking=True,
+    use_hybrid_search=True,
+    rrf_k=60
+)
+
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    retrieval_config=retrieval_config
+)
+```
+
+## Configuration Strategies
+
+### Fast and Focused
+
+For quick, focused answers:
+
+```python
+retrieval_config = RetrievalConfig(
+    top_k=5,
+    rerank_top_k=2,
+    use_query_rewriting=False,
+    use_reranking=True
+)
+```
+
+### Comprehensive
+
+For thorough, well-sourced answers:
+
+```python
+retrieval_config = RetrievalConfig(
+    top_k=20,
+    rerank_top_k=5,
+    use_query_rewriting=True,
+    use_reranking=True
+)
+```
+
+### Hybrid Search
+
+For queries with specific keywords or technical terms:
+
+```python
+retrieval_config = RetrievalConfig(
+    top_k=10,
+    rerank_top_k=3,
+    use_hybrid_search=True,
+    use_query_rewriting=True,
+    use_reranking=True
+)
+```
+
+### Semantic Only
+
+For purely conceptual queries:
+
+```python
+retrieval_config = RetrievalConfig(
+    top_k=10,
+    rerank_top_k=3,
+    use_hybrid_search=False,
+    use_query_rewriting=True
+)
+```
+
+## Parameter Guidelines
+
+### top_k
+
+Number of chunks to retrieve initially:
+
+- **5-10**: Fast, focused answers
+- **10-15**: Balanced (recommended default)
+- **15-25**: Comprehensive, thorough answers
+- **>25**: May include noise, slower
+
+### rerank_top_k
+
+Number of chunks to keep after reranking:
+
+- **2-3**: Concise answers
+- **3-5**: Balanced (recommended)
+- **5-10**: Detailed answers with multiple sources
+- Should always be ≤ `top_k`
+
+### use_query_rewriting
+
+Generate query variations for better retrieval:
+
+- **True**: Better recall, finds more relevant content (recommended)
+- **False**: Faster, uses only original query
+
+### use_reranking
+
+Rerank retrieved chunks by relevance:
+
+- **True**: Higher quality results (recommended)
+- **False**: Faster, relies on initial ranking
+
+### use_hybrid_search
+
+Combine semantic and keyword search:
+
+- **True**: Better for specific terms, technical content
+- **False**: Faster, semantic-only search (default)
+
+### rrf_k
+
+RRF fusion constant for hybrid search:
+
+- **20-40**: More weight to top results
+- **60**: Balanced (default)
+- **70-80**: More even distribution
+
+## Runtime Override
+
+You can override config values when querying:
+
+```python
+# Default configuration
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    retrieval_config=RetrievalConfig(top_k=10, rerank_top_k=3)
+)
+
+# Override for specific query
+response = rag.query(
+    "What is this about?",
+    top_k=20,        # Override default
+    rerank_top_k=5   # Override default
+)
+```
+
+## Performance Trade-offs
+
+| Configuration | Speed | Quality | Cost |
+|---------------|-------|---------|------|
+| top_k=5, no rewriting | ⚡⚡⚡ | ⭐⭐ | 💰 |
+| top_k=10, with reranking | ⚡⚡ | ⭐⭐⭐⭐ | 💰💰 |
+| top_k=20, full features | ⚡ | ⭐⭐⭐⭐⭐ | 💰💰💰 |
+
+## Complete Example
+
+```python
+from mini import AgenticRAG, LLMConfig, RetrievalConfig, RerankerConfig
+
+# Production configuration
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    llm_config=LLMConfig(
+        model="gpt-4o-mini",
+        temperature=0.7
+    ),
+    retrieval_config=RetrievalConfig(
+        top_k=15,
+        rerank_top_k=5,
+        use_query_rewriting=True,
+        use_reranking=True,
+        use_hybrid_search=True,
+        rrf_k=60
+    ),
+    reranker_config=RerankerConfig(type="cohere")
+)
+
+# Query with default config
+response = rag.query("What are the key findings?")
+
+# Query with custom retrieval
+response = rag.query(
+    "Specific technical question?",
+    top_k=25,
+    rerank_top_k=10
+)
+```
+
+## See Also
+
+<CardGroup cols={3}>
+  <Card title="LLMConfig" href="/api-reference/config/llm-config">
+    Configure language model
+  </Card>
+  <Card title="RerankerConfig" href="/api-reference/config/reranker-config">
+    Configure reranking
+  </Card>
+  <Card title="Hybrid Search" href="/features/hybrid-search">
+    Learn about hybrid search
+  </Card>
+</CardGroup>
+
