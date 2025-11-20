@@ -135,7 +135,7 @@
     "primary": {
       "type": "button",
       "label": "Install",
-      "href": "/installation"
+      "href": "https://pypi.org/project/mini-rag/"
     }
   },
   "contextual": {
