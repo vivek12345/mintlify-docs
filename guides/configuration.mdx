@@ -1,0 +1,610 @@
+---
+title: "Configuration"
+description: "Comprehensive guide to configuring Mini RAG for your needs"
+---
+
+## Overview
+
+Mini RAG uses a clean, configuration-based API that organizes settings into logical groups. This approach provides better organization, easier maintenance, and clearer code.
+
+## Configuration Classes
+
+Mini RAG provides four main configuration classes:
+
+<CardGroup cols={2}>
+  <Card title="LLMConfig" icon="brain">
+    Configure your language model settings
+  </Card>
+  <Card title="RetrievalConfig" icon="magnifying-glass">
+    Control retrieval behavior
+  </Card>
+  <Card title="RerankerConfig" icon="ranking-star">
+    Choose and configure reranking
+  </Card>
+  <Card title="ObservabilityConfig" icon="chart-line">
+    Enable monitoring and tracing
+  </Card>
+</CardGroup>
+
+## LLMConfig
+
+Configure your language model for answer generation.
+
+### Basic Configuration
+
+```python
+from mini import AgenticRAG, LLMConfig
+
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    llm_config=LLMConfig(
+        model="gpt-4o-mini"
+    )
+)
+```
+
+### Complete Options
+
+```python
+from mini import LLMConfig
+
+llm_config = LLMConfig(
+    model="gpt-4o-mini",              # Model name
+    api_key=None,                      # API key (defaults to OPENAI_API_KEY env var)
+    base_url=None,                     # Base URL (defaults to OPENAI_BASE_URL env var)
+    temperature=0.7,                   # Response randomness (0.0-2.0)
+    timeout=60.0,                      # Request timeout in seconds
+    max_retries=3                      # Number of retry attempts
+)
+
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    llm_config=llm_config
+)
+```
+
+### Parameter Reference
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `model` | `str` | `"gpt-4"` | Model identifier |
+| `api_key` | `Optional[str]` | `None` | API key (uses env var if None) |
+| `base_url` | `Optional[str]` | `None` | Custom API endpoint |
+| `temperature` | `float` | `0.7` | Sampling temperature |
+| `timeout` | `float` | `60.0` | Request timeout |
+| `max_retries` | `int` | `3` | Retry attempts |
+
+### Common Configurations
+
+#### Using OpenAI
+
+```python
+llm_config = LLMConfig(
+    model="gpt-4o-mini",
+    temperature=0.7
+)
+```
+
+#### Using Azure OpenAI
+
+```python
+llm_config = LLMConfig(
+    model="gpt-4",
+    api_key="your-azure-key",
+    base_url="https://your-resource.openai.azure.com/openai/deployments/your-deployment",
+    temperature=0.7
+)
+```
+
+#### Using Compatible API
+
+```python
+# For OpenAI-compatible endpoints (e.g., llama.cpp, vLLM)
+llm_config = LLMConfig(
+    model="mistral-7b",
+    api_key="not-needed",
+    base_url="http://localhost:8080/v1",
+    temperature=0.5
+)
+```
+
+## RetrievalConfig
+
+Control how documents are retrieved and processed.
+
+### Basic Configuration
+
+```python
+from mini import RetrievalConfig
+
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    retrieval_config=RetrievalConfig(
+        top_k=10,
+        rerank_top_k=3
+    )
+)
+```
+
+### Complete Options
+
+```python
+from mini import RetrievalConfig
+
+retrieval_config = RetrievalConfig(
+    top_k=10,                          # Number of chunks to retrieve initially
+    rerank_top_k=3,                    # Number of chunks to keep after reranking
+    use_query_rewriting=True,          # Enable query rewriting
+    use_reranking=True,                # Enable reranking
+    use_hybrid_search=False,           # Enable hybrid search (semantic + BM25)
+    rrf_k=60                           # RRF constant for hybrid search
+)
+
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    retrieval_config=retrieval_config
+)
+```
+
+### Parameter Reference
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `top_k` | `int` | `5` | Initial retrieval count |
+| `rerank_top_k` | `int` | `3` | Final chunk count after reranking |
+| `use_query_rewriting` | `bool` | `True` | Generate query variations |
+| `use_reranking` | `bool` | `True` | Rerank retrieved chunks |
+| `use_hybrid_search` | `bool` | `False` | Combine semantic + keyword search |
+| `rrf_k` | `int` | `60` | RRF fusion constant |
+
+### Tuning Guidelines
+
+#### For Comprehensive Answers
+
+```python
+# Retrieve more context, use more in final answer
+RetrievalConfig(
+    top_k=20,
+    rerank_top_k=5,
+    use_query_rewriting=True,
+    use_reranking=True
+)
+```
+
+#### For Fast, Focused Answers
+
+```python
+# Retrieve less, quick responses
+RetrievalConfig(
+    top_k=5,
+    rerank_top_k=2,
+    use_query_rewriting=False,
+    use_reranking=True
+)
+```
+
+#### For Technical/Keyword Queries
+
+```python
+# Use hybrid search for better keyword matching
+RetrievalConfig(
+    top_k=10,
+    rerank_top_k=3,
+    use_hybrid_search=True,
+    use_query_rewriting=True
+)
+```
+
+## RerankerConfig
+
+Choose and configure your reranking strategy.
+
+### Available Rerankers
+
+Mini RAG supports four reranking strategies:
+
+1. **LLM-based** (default): Uses your LLM to score chunks
+2. **Cohere**: Uses Cohere's specialized reranking API
+3. **Sentence Transformer**: Uses local cross-encoder models
+4. **None**: Disables reranking
+
+### LLM-based Reranking
+
+```python
+from mini import RerankerConfig
+
+# Default - uses your LLM
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    reranker_config=RerankerConfig(
+        type="llm"
+    )
+)
+```
+
+### Cohere Reranking
+
+```python
+import os
+from mini import RerankerConfig
+
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    reranker_config=RerankerConfig(
+        type="cohere",
+        kwargs={
+            "api_key": os.getenv("COHERE_API_KEY"),
+            "model": "rerank-english-v3.0",  # or "rerank-multilingual-v3.0"
+            "max_chunks_per_doc": None
+        }
+    )
+)
+```
+
+### Sentence Transformer Reranking
+
+```python
+from mini import RerankerConfig
+
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    reranker_config=RerankerConfig(
+        type="sentence-transformer",
+        kwargs={
+            "model_name": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+            "device": "cuda"  # or "cpu"
+        }
+    )
+)
+```
+
+### Custom Reranker
+
+```python
+from mini import RerankerConfig
+from mini.reranker import CohereReranker
+
+# Create custom reranker instance
+custom_reranker = CohereReranker(
+    api_key="your-key",
+    model="rerank-multilingual-v3.0"
+)
+
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    reranker_config=RerankerConfig(
+        custom_reranker=custom_reranker
+    )
+)
+```
+
+### Disable Reranking
+
+```python
+from mini import RerankerConfig
+
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    reranker_config=RerankerConfig(
+        type="none"
+    )
+)
+```
+
+### Comparison
+
+| Reranker | Pros | Cons | Best For |
+|----------|------|------|----------|
+| **LLM-based** | Simple, no extra APIs | Uses LLM tokens | General use |
+| **Cohere** | Highest quality | Requires API key, costs | Production quality |
+| **Sentence Transformer** | Local, private, free | Requires GPU for speed | Privacy-sensitive |
+| **None** | Fastest | Lower quality | Speed-critical |
+
+## ObservabilityConfig
+
+Enable monitoring and tracing with Langfuse.
+
+### Basic Configuration
+
+```python
+from mini import ObservabilityConfig
+
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    observability_config=ObservabilityConfig(
+        enabled=True
+    )
+)
+```
+
+### Complete Options
+
+```python
+import os
+from mini import ObservabilityConfig
+
+observability_config = ObservabilityConfig(
+    enabled=True,
+    public_key=os.getenv("LANGFUSE_PUBLIC_KEY"),
+    secret_key=os.getenv("LANGFUSE_SECRET_KEY"),
+    host="https://cloud.langfuse.com"
+)
+
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    observability_config=observability_config
+)
+```
+
+### What Gets Tracked
+
+When enabled, Mini RAG tracks:
+
+- 🔍 Query rewriting operations
+- 📚 Document retrieval metrics
+- 🎯 Reranking performance
+- 💬 LLM generation calls
+- 📄 Document indexing pipeline
+- ⏱️ Latency for each step
+- 🎭 Input/output data
+
+### Setup Langfuse
+
+<Steps>
+  <Step title="Sign Up">
+    Create a free account at [Langfuse Cloud](https://cloud.langfuse.com)
+  </Step>
+  
+  <Step title="Get API Keys">
+    Get your public and secret keys from project settings
+  </Step>
+  
+  <Step title="Set Environment Variables">
+    ```bash
+    LANGFUSE_PUBLIC_KEY=pk-lf-...
+    LANGFUSE_SECRET_KEY=sk-lf-...
+    LANGFUSE_HOST=https://cloud.langfuse.com
+    ```
+  </Step>
+  
+  <Step title="Enable in Code">
+    ```python
+    observability_config=ObservabilityConfig(enabled=True)
+    ```
+  </Step>
+</Steps>
+
+## Embedding Configuration
+
+Configure the embedding model separately if needed.
+
+### Basic Configuration
+
+```python
+from mini import EmbeddingModel
+
+embedding_model = EmbeddingModel()  # Uses defaults from env vars
+```
+
+### Complete Options
+
+```python
+from mini import EmbeddingModel
+
+embedding_model = EmbeddingModel(
+    api_key="sk-...",                          # API key
+    base_url="https://api.openai.com/v1",      # Custom endpoint
+    model="text-embedding-3-small",            # Model name
+    dimensions=None,                            # Custom dimensions (if supported)
+    timeout=60.0,                               # Request timeout
+    max_retries=3                               # Retry attempts
+)
+```
+
+### Provider Examples
+
+#### OpenAI
+
+```python
+embedding_model = EmbeddingModel(
+    model="text-embedding-3-small",
+    dimensions=1536
+)
+```
+
+#### Azure OpenAI
+
+```python
+embedding_model = EmbeddingModel(
+    api_key="your-azure-key",
+    base_url="https://your-resource.openai.azure.com/openai/deployments/your-deployment",
+    model="text-embedding-ada-002"
+)
+```
+
+#### Local Model
+
+```python
+# Using llama.cpp or similar
+embedding_model = EmbeddingModel(
+    api_key="not-needed",
+    base_url="http://localhost:8080/v1",
+    model="text-embedding"
+)
+```
+
+## Vector Store Configuration
+
+Configure Milvus vector storage.
+
+### Basic Configuration
+
+```python
+from mini import VectorStore
+
+vector_store = VectorStore(
+    uri=os.getenv("MILVUS_URI"),
+    token=os.getenv("MILVUS_TOKEN"),
+    collection_name="my_collection",
+    dimension=1536
+)
+```
+
+### Complete Options
+
+```python
+from mini import VectorStore
+
+vector_store = VectorStore(
+    uri="https://your-instance.com",           # Milvus URI
+    token="your-token",                        # Authentication token
+    collection_name="documents",               # Collection name
+    dimension=1536,                            # Embedding dimension
+    metric_type="IP",                          # Similarity metric
+    index_type="IVF_FLAT",                    # Index type
+    nlist=128                                  # Number of clusters
+)
+```
+
+### Parameter Reference
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `uri` | `str` | - | Milvus server URI |
+| `token` | `str` | - | Authentication token |
+| `collection_name` | `str` | - | Collection identifier |
+| `dimension` | `int` | - | Embedding vector dimension |
+| `metric_type` | `str` | `"IP"` | Distance metric (IP, L2, COSINE) |
+| `index_type` | `str` | `"IVF_FLAT"` | Index algorithm |
+| `nlist` | `int` | `128` | Number of cluster units |
+
+### Metric Types
+
+- **IP** (Inner Product): Fast, recommended for normalized vectors (cosine similarity)
+- **L2**: Euclidean distance
+- **COSINE**: Direct cosine similarity
+
+### Index Types
+
+- **IVF_FLAT**: Good balance of speed and accuracy
+- **IVF_SQ8**: Faster, uses less memory
+- **HNSW**: Highest accuracy, more memory
+
+## Full Configuration Example
+
+Putting it all together:
+
+```python
+import os
+from mini import (
+    AgenticRAG,
+    LLMConfig,
+    RetrievalConfig,
+    RerankerConfig,
+    ObservabilityConfig,
+    EmbeddingModel,
+    VectorStore
+)
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Embedding model
+embedding_model = EmbeddingModel(
+    model="text-embedding-3-small",
+    timeout=60.0
+)
+
+# Vector store
+vector_store = VectorStore(
+    uri=os.getenv("MILVUS_URI"),
+    token=os.getenv("MILVUS_TOKEN"),
+    collection_name="production_docs",
+    dimension=1536,
+    metric_type="IP",
+    index_type="IVF_FLAT"
+)
+
+# RAG with all configs
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    llm_config=LLMConfig(
+        model="gpt-4o-mini",
+        temperature=0.7,
+        timeout=120.0,
+        max_retries=3
+    ),
+    retrieval_config=RetrievalConfig(
+        top_k=10,
+        rerank_top_k=3,
+        use_query_rewriting=True,
+        use_reranking=True,
+        use_hybrid_search=True
+    ),
+    reranker_config=RerankerConfig(
+        type="cohere",
+        kwargs={
+            "api_key": os.getenv("COHERE_API_KEY"),
+            "model": "rerank-english-v3.0"
+        }
+    ),
+    observability_config=ObservabilityConfig(
+        enabled=True,
+        public_key=os.getenv("LANGFUSE_PUBLIC_KEY"),
+        secret_key=os.getenv("LANGFUSE_SECRET_KEY")
+    )
+)
+```
+
+## Environment Variables
+
+Recommended `.env` file structure:
+
+```bash
+# OpenAI
+OPENAI_API_KEY=sk-your-key
+OPENAI_BASE_URL=https://api.openai.com/v1
+EMBEDDING_MODEL=text-embedding-3-small
+
+# Milvus
+MILVUS_URI=https://your-instance.com
+MILVUS_TOKEN=your-token
+
+# Cohere (optional)
+COHERE_API_KEY=your-cohere-key
+
+# Langfuse (optional)
+LANGFUSE_PUBLIC_KEY=pk-lf-...
+LANGFUSE_SECRET_KEY=sk-lf-...
+LANGFUSE_HOST=https://cloud.langfuse.com
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Integration Guide" icon="link" href="/guides/integration">
+    Integrate Mini RAG into your applications
+  </Card>
+  <Card title="Production Guide" icon="rocket" href="/guides/production">
+    Deploy to production
+  </Card>
+  <Card title="Features" icon="sparkles" href="/features/agentic-rag">
+    Explore advanced features
+  </Card>
+  <Card title="Examples" icon="code" href="/examples/document-qa">
+    See complete examples
+  </Card>
+</CardGroup>
+

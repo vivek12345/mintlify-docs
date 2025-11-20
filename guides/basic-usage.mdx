@@ -1,0 +1,472 @@
+---
+title: "Basic Usage"
+description: "Learn the fundamentals of using Mini RAG in your projects"
+---
+
+## Overview
+
+This guide covers the essential operations you'll need to get started with Mini RAG. After installation, you can be up and running in just a few lines of code.
+
+## Prerequisites
+
+Before starting, ensure you have:
+
+<CardGroup cols={2}>
+  <Card title="Python 3.11+" icon="python">
+    Mini RAG requires Python 3.11 or higher
+  </Card>
+  <Card title="API Keys" icon="key">
+    OpenAI API key (or compatible provider)
+  </Card>
+  <Card title="Vector Database" icon="database">
+    Milvus instance (local or cloud)
+  </Card>
+  <Card title="Mini RAG" icon="box">
+    Install with `uv add mini-rag`
+  </Card>
+</CardGroup>
+
+## Quick Start
+
+The fastest way to get started is with this minimal example:
+
+```python
+import os
+from mini import AgenticRAG, EmbeddingModel, VectorStore
+
+# Initialize components
+embedding_model = EmbeddingModel()
+vector_store = VectorStore(
+    uri=os.getenv("MILVUS_URI"),
+    token=os.getenv("MILVUS_TOKEN"),
+    collection_name="my_docs",
+    dimension=1536
+)
+rag = AgenticRAG(vector_store=vector_store, embedding_model=embedding_model)
+
+# Index a document
+rag.index_document("path/to/document.pdf")
+
+# Ask a question
+response = rag.query("What is this document about?")
+print(response.answer)
+```
+
+That's it! Mini RAG handles all the complexity automatically.
+
+## Core Operations
+
+### 1. Initialize the System
+
+Set up your RAG system with the necessary components:
+
+```python
+import os
+from mini import (
+    AgenticRAG,
+    LLMConfig,
+    RetrievalConfig,
+    EmbeddingModel,
+    VectorStore
+)
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Create embedding model
+embedding_model = EmbeddingModel()
+
+# Create vector store
+vector_store = VectorStore(
+    uri=os.getenv("MILVUS_URI"),
+    token=os.getenv("MILVUS_TOKEN"),
+    collection_name="knowledge_base",
+    dimension=1536
+)
+
+# Initialize RAG
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    llm_config=LLMConfig(
+        model="gpt-4o-mini",
+        temperature=0.7
+    ),
+    retrieval_config=RetrievalConfig(
+        top_k=10,
+        rerank_top_k=3,
+        use_query_rewriting=True,
+        use_reranking=True
+    )
+)
+```
+
+### 2. Index Documents
+
+Add documents to your knowledge base:
+
+#### Single Document
+
+```python
+# Index one document
+num_chunks = rag.index_document("document.pdf")
+print(f"Indexed {num_chunks} chunks")
+```
+
+#### Multiple Documents
+
+```python
+# Index multiple documents
+documents = [
+    "doc1.pdf",
+    "doc2.docx",
+    "doc3.txt"
+]
+total_chunks = rag.index_documents(documents)
+print(f"Indexed {total_chunks} chunks total")
+```
+
+#### With Metadata
+
+```python
+# Add metadata for better organization
+rag.index_document(
+    "research_paper.pdf",
+    metadata={
+        "category": "research",
+        "year": 2024,
+        "author": "John Doe",
+        "department": "AI Research"
+    }
+)
+```
+
+### 3. Query the System
+
+Ask questions and get answers:
+
+#### Basic Query
+
+```python
+response = rag.query("What is the main topic?")
+print(response.answer)
+```
+
+#### With Custom Parameters
+
+```python
+response = rag.query(
+    query="What are the key findings?",
+    top_k=15,  # Retrieve more candidates
+    rerank_top_k=5,  # Keep top 5 after reranking
+    return_sources=True
+)
+
+print(f"Answer: {response.answer}")
+print(f"\nUsed {len(response.retrieved_chunks)} sources")
+```
+
+#### Access Response Details
+
+```python
+response = rag.query("What is the budget allocation?")
+
+# The answer
+print(f"Answer:\n{response.answer}\n")
+
+# Query variations (if query rewriting is enabled)
+print(f"Original query: {response.original_query}")
+print(f"Query variations: {response.rewritten_queries}\n")
+
+# Source documents
+for i, chunk in enumerate(response.retrieved_chunks, 1):
+    print(f"Source {i}:")
+    print(f"  Text: {chunk.text[:100]}...")
+    print(f"  Score: {chunk.reranked_score or chunk.score:.4f}")
+    print(f"  Metadata: {chunk.metadata}\n")
+
+# Metadata
+print(f"Response metadata: {response.metadata}")
+```
+
+## Working with Individual Components
+
+Mini RAG's modular design lets you use individual components:
+
+### Document Loading
+
+```python
+from mini.loader import DocumentLoader
+
+loader = DocumentLoader()
+
+# Load a single file
+text = loader.load("document.pdf")
+
+# Load multiple files
+texts = loader.load_documents(["doc1.pdf", "doc2.docx"])
+
+# Load from directory
+texts = loader.load_documents_from_directory("./documents/")
+```
+
+### Text Chunking
+
+```python
+from mini.chunker import Chunker
+
+chunker = Chunker(lang="en")
+
+# Chunk text
+chunks = chunker.chunk(text)
+
+# Inspect chunks
+for chunk in chunks[:3]:
+    print(f"Tokens: {chunk.token_count}")
+    print(f"Text: {chunk.text[:100]}...\n")
+```
+
+### Embedding Generation
+
+```python
+from mini.embedding import EmbeddingModel
+
+embedding_model = EmbeddingModel(
+    model="text-embedding-3-small"
+)
+
+# Embed chunks
+embeddings = embedding_model.embed_chunks([chunk.text for chunk in chunks])
+
+# Embed a query
+query_embedding = embedding_model.embed_query("What is AI?")
+```
+
+### Vector Operations
+
+```python
+from mini.store import VectorStore
+
+store = VectorStore(
+    uri=os.getenv("MILVUS_URI"),
+    token=os.getenv("MILVUS_TOKEN"),
+    collection_name="my_collection",
+    dimension=1536
+)
+
+# Insert vectors
+ids = store.insert(
+    embeddings=embeddings,
+    texts=[chunk.text for chunk in chunks],
+    metadata=[{"source": "doc.pdf", "chunk_id": i} for i in range(len(chunks))]
+)
+
+# Search
+results = store.search(
+    query_embedding=query_embedding,
+    top_k=5
+)
+
+# Get stats
+count = store.count()
+print(f"Total vectors: {count}")
+```
+
+## System Statistics
+
+Monitor your RAG system:
+
+```python
+# Get comprehensive stats
+stats = rag.get_stats()
+print(f"Total documents: {stats['total_documents']}")
+print(f"Collection name: {stats['collection_name']}")
+
+# Check if documents are indexed
+if stats['total_documents'] == 0:
+    print("No documents indexed yet")
+    rag.index_documents(my_documents)
+else:
+    print("Using existing index")
+```
+
+## Environment Configuration
+
+Create a `.env` file in your project root:
+
+```bash
+# Required
+OPENAI_API_KEY=sk-your-api-key-here
+MILVUS_URI=https://your-milvus-instance.com
+MILVUS_TOKEN=your-milvus-token
+
+# Optional
+OPENAI_BASE_URL=https://api.openai.com/v1
+EMBEDDING_MODEL=text-embedding-3-small
+```
+
+Load it in your code:
+
+```python
+from dotenv import load_dotenv
+load_dotenv()
+```
+
+## Error Handling
+
+Handle common errors gracefully:
+
+```python
+from mini import AgenticRAG
+
+try:
+    # Initialize RAG
+    rag = AgenticRAG(
+        vector_store=vector_store,
+        embedding_model=embedding_model
+    )
+    
+    # Index document
+    try:
+        rag.index_document("document.pdf")
+    except FileNotFoundError:
+        print("Document not found")
+    except Exception as e:
+        print(f"Error indexing: {e}")
+    
+    # Query
+    try:
+        response = rag.query("What is this about?")
+        print(response.answer)
+    except Exception as e:
+        print(f"Error querying: {e}")
+        
+except Exception as e:
+    print(f"Failed to initialize RAG: {e}")
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Reuse RAG Instance">
+    Create the RAG instance once and reuse it for multiple operations. Initialization is expensive.
+    
+    ```python
+    # Good
+    rag = AgenticRAG(vector_store, embedding_model)
+    response1 = rag.query("question 1")
+    response2 = rag.query("question 2")
+    
+    # Bad
+    rag1 = AgenticRAG(vector_store, embedding_model)
+    response1 = rag1.query("question 1")
+    rag2 = AgenticRAG(vector_store, embedding_model)
+    response2 = rag2.query("question 2")
+    ```
+  </Accordion>
+  
+  <Accordion title="Use Metadata">
+    Add rich metadata to documents for better organization and filtering.
+    
+    ```python
+    rag.index_document(
+        "document.pdf",
+        metadata={
+            "category": "finance",
+            "date": "2024-01-15",
+            "author": "John Doe",
+            "version": "1.0"
+        }
+    )
+    ```
+  </Accordion>
+  
+  <Accordion title="Tune Retrieval Parameters">
+    Adjust `top_k` and `rerank_top_k` based on your needs:
+    - Higher `top_k`: Better recall, slower
+    - Lower `rerank_top_k`: Faster, more focused answers
+    
+    ```python
+    # For comprehensive answers
+    response = rag.query(query, top_k=20, rerank_top_k=5)
+    
+    # For quick, focused answers
+    response = rag.query(query, top_k=5, rerank_top_k=2)
+    ```
+  </Accordion>
+  
+  <Accordion title="Check Before Indexing">
+    Check if documents are already indexed to avoid duplicates.
+    
+    ```python
+    stats = rag.get_stats()
+    if stats['total_documents'] == 0:
+        rag.index_documents(my_documents)
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Common Patterns
+
+### Pattern 1: Batch Processing
+
+```python
+import os
+from pathlib import Path
+
+# Get all PDFs from a directory
+pdf_dir = Path("./documents")
+pdf_files = list(pdf_dir.glob("*.pdf"))
+
+# Index in batches
+batch_size = 10
+for i in range(0, len(pdf_files), batch_size):
+    batch = pdf_files[i:i + batch_size]
+    rag.index_documents([str(f) for f in batch])
+    print(f"Processed batch {i//batch_size + 1}")
+```
+
+### Pattern 2: Interactive Q&A
+
+```python
+print("Ask questions (type 'quit' to exit)")
+while True:
+    question = input("\nQuestion: ")
+    if question.lower() in ['quit', 'exit']:
+        break
+    
+    response = rag.query(question)
+    print(f"\nAnswer: {response.answer}")
+```
+
+### Pattern 3: Progress Tracking
+
+```python
+from tqdm import tqdm
+
+documents = ["doc1.pdf", "doc2.pdf", "doc3.pdf"]
+
+for doc in tqdm(documents, desc="Indexing"):
+    num_chunks = rag.index_document(doc)
+    tqdm.write(f"{doc}: {num_chunks} chunks")
+```
+
+## Next Steps
+
+Now that you understand the basics, explore more advanced features:
+
+<CardGroup cols={2}>
+  <Card title="Configuration" icon="sliders" href="/guides/configuration">
+    Learn about advanced configuration options
+  </Card>
+  <Card title="Integration" icon="link" href="/guides/integration">
+    Integrate Mini RAG into your applications
+  </Card>
+  <Card title="Hybrid Search" icon="magnifying-glass-plus" href="/features/hybrid-search">
+    Combine semantic and keyword search
+  </Card>
+  <Card title="Reranking" icon="ranking-star" href="/features/reranking">
+    Improve results with reranking
+  </Card>
+</CardGroup>
+

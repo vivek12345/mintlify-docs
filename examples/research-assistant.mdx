@@ -1,0 +1,621 @@
+---
+title: "Research Paper Assistant"
+description: "Build an AI assistant for analyzing and extracting insights from research papers"
+---
+
+## Overview
+
+This example shows how to build a research assistant that can analyze multiple research papers, extract key findings, compare methodologies, and answer questions about academic research.
+
+## Features
+
+<CardGroup cols={2}>
+  <Card title="Multi-Paper Analysis" icon="books">
+    Analyze multiple research papers simultaneously
+  </Card>
+  <Card title="Structured Extraction" icon="list-check">
+    Extract abstracts, methodologies, findings, and conclusions
+  </Card>
+  <Card title="Comparative Analysis" icon="code-compare">
+    Compare findings across papers
+  </Card>
+  <Card title="Citation Tracking" icon="quote-left">
+    Track which papers support which claims
+  </Card>
+</CardGroup>
+
+## Complete Implementation
+
+```python
+import os
+from typing import List, Dict, Optional
+from dataclasses import dataclass
+from pathlib import Path
+from mini import (
+    AgenticRAG,
+    LLMConfig,
+    RetrievalConfig,
+    EmbeddingModel,
+    VectorStore
+)
+from dotenv import load_dotenv
+
+load_dotenv()
+
+@dataclass
+class PaperMetadata:
+    """Metadata for a research paper."""
+    title: str
+    authors: Optional[List[str]] = None
+    year: Optional[int] = None
+    venue: Optional[str] = None
+    doi: Optional[str] = None
+    abstract: Optional[str] = None
+    keywords: Optional[List[str]] = None
+
+class ResearchAssistant:
+    """
+    An AI assistant for analyzing research papers and extracting insights.
+    """
+    
+    def __init__(
+        self,
+        milvus_uri: str,
+        milvus_token: str,
+        collection_name: str = "research_papers"
+    ):
+        """Initialize the research assistant."""
+        # Initialize RAG components
+        self.embedding_model = EmbeddingModel()
+        self.vector_store = VectorStore(
+            uri=milvus_uri,
+            token=milvus_token,
+            collection_name=collection_name,
+            dimension=1536
+        )
+        
+        self.rag = AgenticRAG(
+            vector_store=self.vector_store,
+            embedding_model=self.embedding_model,
+            llm_config=LLMConfig(
+                model="gpt-4o-mini",
+                temperature=0.3  # Lower for more focused academic responses
+            ),
+            retrieval_config=RetrievalConfig(
+                top_k=15,  # More context for research
+                rerank_top_k=5,
+                use_query_rewriting=True,
+                use_reranking=True
+            )
+        )
+        
+        # Track indexed papers
+        self.papers: Dict[str, PaperMetadata] = {}
+    
+    def index_paper(
+        self,
+        paper_path: str,
+        metadata: Optional[PaperMetadata] = None
+    ) -> int:
+        """
+        Index a research paper.
+        
+        Args:
+            paper_path: Path to the paper PDF
+            metadata: Optional paper metadata
+            
+        Returns:
+            Number of chunks indexed
+        """
+        paper_name = Path(paper_path).stem
+        
+        # Create metadata dict
+        meta_dict = {
+            "source": paper_path,
+            "paper_id": paper_name,
+            "type": "research_paper"
+        }
+        
+        if metadata:
+            meta_dict.update({
+                "title": metadata.title,
+                "authors": ",".join(metadata.authors) if metadata.authors else None,
+                "year": metadata.year,
+                "venue": metadata.venue,
+                "doi": metadata.doi
+            })
+            
+            # Store metadata
+            self.papers[paper_name] = metadata
+        
+        # Index the paper
+        num_chunks = self.rag.index_document(paper_path, metadata=meta_dict)
+        
+        print(f"✓ Indexed: {metadata.title if metadata else paper_name}")
+        print(f"  Chunks: {num_chunks}\n")
+        
+        return num_chunks
+    
+    def index_papers(
+        self,
+        paper_paths: List[str],
+        metadata_list: Optional[List[PaperMetadata]] = None
+    ) -> Dict[str, int]:
+        """
+        Index multiple research papers.
+        
+        Args:
+            paper_paths: List of paths to paper PDFs
+            metadata_list: Optional list of metadata for each paper
+            
+        Returns:
+            Dictionary mapping paper paths to chunk counts
+        """
+        print("📚 Indexing research papers...\n")
+        
+        results = {}
+        metadata_list = metadata_list or [None] * len(paper_paths)
+        
+        for paper_path, metadata in zip(paper_paths, metadata_list):
+            try:
+                num_chunks = self.index_paper(paper_path, metadata)
+                results[paper_path] = num_chunks
+            except Exception as e:
+                print(f"✗ Error indexing {paper_path}: {e}\n")
+                results[paper_path] = 0
+        
+        total_chunks = sum(results.values())
+        print(f"✅ Total: {len(paper_paths)} papers, {total_chunks} chunks indexed\n")
+        
+        return results
+    
+    def extract_abstract(self, paper_id: str) -> str:
+        """Extract the abstract from a paper."""
+        query = f"What is the abstract or summary of the paper {paper_id}?"
+        response = self.rag.query(query)
+        return response.answer
+    
+    def extract_methodology(self, paper_id: str) -> str:
+        """Extract the methodology from a paper."""
+        query = f"What methodology or approach was used in the paper {paper_id}? Describe the methods, datasets, and experimental setup."
+        response = self.rag.query(query)
+        return response.answer
+    
+    def extract_findings(self, paper_id: str) -> str:
+        """Extract key findings from a paper."""
+        query = f"What are the main findings and results of the paper {paper_id}?"
+        response = self.rag.query(query)
+        return response.answer
+    
+    def extract_limitations(self, paper_id: str) -> str:
+        """Extract limitations from a paper."""
+        query = f"What are the limitations or future work mentioned in the paper {paper_id}?"
+        response = self.rag.query(query)
+        return response.answer
+    
+    def compare_papers(
+        self,
+        aspect: str,
+        paper_ids: Optional[List[str]] = None
+    ) -> str:
+        """
+        Compare papers on a specific aspect.
+        
+        Args:
+            aspect: What to compare (e.g., "methodologies", "findings", "datasets")
+            paper_ids: Optional list of specific papers to compare
+            
+        Returns:
+            Comparison text
+        """
+        if paper_ids:
+            papers_str = ", ".join(paper_ids)
+            query = f"Compare the {aspect} across these papers: {papers_str}. Highlight similarities and differences."
+        else:
+            query = f"Compare the {aspect} across all indexed papers. Highlight similarities and differences."
+        
+        response = self.rag.query(query, top_k=20, rerank_top_k=10)
+        return response.answer
+    
+    def find_papers_about(self, topic: str, top_k: int = 5) -> List[Dict]:
+        """
+        Find papers about a specific topic.
+        
+        Args:
+            topic: Topic to search for
+            top_k: Number of papers to return
+            
+        Returns:
+            List of relevant papers with scores
+        """
+        query = f"Which papers discuss {topic}? List the relevant papers and what they say about this topic."
+        response = self.rag.query(query, top_k=top_k * 3, rerank_top_k=top_k)
+        
+        # Extract unique papers from sources
+        papers = {}
+        for chunk in response.retrieved_chunks:
+            paper_id = chunk.metadata.get('paper_id', 'Unknown')
+            if paper_id not in papers:
+                papers[paper_id] = {
+                    "paper_id": paper_id,
+                    "title": self.papers.get(paper_id, PaperMetadata(title=paper_id)).title,
+                    "relevance_score": chunk.reranked_score or chunk.score,
+                    "excerpt": chunk.text[:200] + "..."
+                }
+        
+        return list(papers.values())[:top_k]
+    
+    def synthesize_findings(self, research_question: str) -> Dict:
+        """
+        Synthesize findings across papers to answer a research question.
+        
+        Args:
+            research_question: The research question to answer
+            
+        Returns:
+            Dictionary with synthesis, supporting papers, and sources
+        """
+        # Query the RAG system
+        response = self.rag.query(
+            research_question,
+            top_k=20,
+            rerank_top_k=10
+        )
+        
+        # Extract supporting papers
+        supporting_papers = set()
+        for chunk in response.retrieved_chunks:
+            paper_id = chunk.metadata.get('paper_id', 'Unknown')
+            supporting_papers.add(paper_id)
+        
+        return {
+            "synthesis": response.answer,
+            "supporting_papers": list(supporting_papers),
+            "num_sources": len(response.retrieved_chunks),
+            "query_variations": response.rewritten_queries,
+            "sources": [
+                {
+                    "paper_id": chunk.metadata.get('paper_id', 'Unknown'),
+                    "text": chunk.text[:200] + "...",
+                    "score": chunk.reranked_score or chunk.score
+                }
+                for chunk in response.retrieved_chunks
+            ]
+        }
+    
+    def generate_literature_review(
+        self,
+        topic: str,
+        sections: Optional[List[str]] = None
+    ) -> str:
+        """
+        Generate a structured literature review.
+        
+        Args:
+            topic: The topic for the literature review
+            sections: Optional list of sections to include
+            
+        Returns:
+            Formatted literature review
+        """
+        sections = sections or [
+            "Introduction",
+            "Methodologies",
+            "Key Findings",
+            "Comparative Analysis",
+            "Limitations and Future Work"
+        ]
+        
+        review_parts = []
+        review_parts.append(f"# Literature Review: {topic}\n")
+        
+        for section in sections:
+            print(f"Generating section: {section}...")
+            query = f"Write a {section} section for a literature review on {topic}, based on the indexed research papers. Include citations."
+            response = self.rag.query(query, top_k=20, rerank_top_k=8)
+            
+            review_parts.append(f"\n## {section}\n")
+            review_parts.append(response.answer)
+            review_parts.append("\n")
+        
+        return "\n".join(review_parts)
+    
+    def ask(self, question: str) -> str:
+        """
+        Ask a question about the indexed papers.
+        
+        Args:
+            question: Research question
+            
+        Returns:
+            Answer with citations
+        """
+        response = self.rag.query(question)
+        return response.answer
+    
+    def get_stats(self) -> Dict:
+        """Get research assistant statistics."""
+        rag_stats = self.rag.get_stats()
+        
+        return {
+            "total_papers": len(self.papers),
+            "total_chunks": rag_stats['total_documents'],
+            "indexed_papers": list(self.papers.keys()),
+            "collection_name": rag_stats['collection_name']
+        }
+
+def main():
+    """Example usage of the ResearchAssistant."""
+    # Initialize assistant
+    assistant = ResearchAssistant(
+        milvus_uri=os.getenv("MILVUS_URI"),
+        milvus_token=os.getenv("MILVUS_TOKEN")
+    )
+    
+    # Define papers with metadata
+    papers = [
+        (
+            "./papers/attention_is_all_you_need.pdf",
+            PaperMetadata(
+                title="Attention Is All You Need",
+                authors=["Vaswani et al."],
+                year=2017,
+                venue="NeurIPS",
+                keywords=["transformers", "attention", "neural networks"]
+            )
+        ),
+        (
+            "./papers/bert.pdf",
+            PaperMetadata(
+                title="BERT: Pre-training of Deep Bidirectional Transformers",
+                authors=["Devlin et al."],
+                year=2019,
+                venue="NAACL",
+                keywords=["transformers", "pre-training", "NLP"]
+            )
+        ),
+        (
+            "./papers/gpt3.pdf",
+            PaperMetadata(
+                title="Language Models are Few-Shot Learners",
+                authors=["Brown et al."],
+                year=2020,
+                venue="NeurIPS",
+                keywords=["language models", "few-shot learning", "GPT"]
+            )
+        )
+    ]
+    
+    # Index papers
+    paper_paths = [path for path, _ in papers]
+    metadata_list = [meta for _, meta in papers]
+    
+    stats = assistant.get_stats()
+    if stats['total_chunks'] == 0:
+        assistant.index_papers(paper_paths, metadata_list)
+    else:
+        print(f"📊 Using existing index: {stats['total_papers']} papers\n")
+    
+    # Interactive research assistant
+    print("=== Research Assistant ===")
+    print("Commands:")
+    print("  'compare <aspect>' - Compare papers on an aspect")
+    print("  'find <topic>' - Find papers about a topic")
+    print("  'synthesize <question>' - Synthesize findings")
+    print("  'review <topic>' - Generate literature review")
+    print("  'stats' - Show statistics")
+    print("  'quit' - Exit\n")
+    
+    while True:
+        command = input("Research> ").strip()
+        
+        if not command:
+            continue
+        
+        if command.lower() in ['quit', 'exit', 'q']:
+            print("\nGoodbye! 👋")
+            break
+        
+        try:
+            if command.startswith('compare '):
+                aspect = command[8:].strip()
+                print("\n📊 Comparing papers...\n")
+                result = assistant.compare_papers(aspect)
+                print(result)
+                print()
+            
+            elif command.startswith('find '):
+                topic = command[5:].strip()
+                print(f"\n🔍 Finding papers about '{topic}'...\n")
+                papers = assistant.find_papers_about(topic)
+                for i, paper in enumerate(papers, 1):
+                    print(f"{i}. {paper['title']}")
+                    print(f"   Score: {paper['relevance_score']:.3f}")
+                    print(f"   Excerpt: {paper['excerpt']}\n")
+            
+            elif command.startswith('synthesize '):
+                question = command[11:].strip()
+                print(f"\n🔬 Synthesizing findings...\n")
+                result = assistant.synthesize_findings(question)
+                print(f"Answer:\n{result['synthesis']}\n")
+                print(f"Based on {result['num_sources']} sources from {len(result['supporting_papers'])} papers:")
+                for paper_id in result['supporting_papers']:
+                    print(f"  - {paper_id}")
+                print()
+            
+            elif command.startswith('review '):
+                topic = command[7:].strip()
+                print(f"\n📝 Generating literature review on '{topic}'...\n")
+                review = assistant.generate_literature_review(topic)
+                print(review)
+            
+            elif command == 'stats':
+                stats = assistant.get_stats()
+                print(f"\n📊 Statistics:")
+                print(f"  Papers indexed: {stats['total_papers']}")
+                print(f"  Total chunks: {stats['total_chunks']}")
+                print(f"  Papers: {', '.join(stats['indexed_papers'])}\n")
+            
+            else:
+                # Treat as a question
+                print("\n💡 Searching research papers...\n")
+                answer = assistant.ask(command)
+                print(answer)
+                print()
+        
+        except Exception as e:
+            print(f"\n❌ Error: {e}\n")
+
+if __name__ == "__main__":
+    main()
+```
+
+## Running the Example
+
+<Steps>
+  <Step title="Install Dependencies">
+    ```bash
+    uv add mini-rag
+    ```
+  </Step>
+  
+  <Step title="Set Environment Variables">
+    ```bash
+    OPENAI_API_KEY=sk-...
+    MILVUS_URI=https://...
+    MILVUS_TOKEN=...
+    ```
+  </Step>
+  
+  <Step title="Prepare Papers">
+    Place your research papers (PDFs) in a `./papers/` folder
+  </Step>
+  
+  <Step title="Run the Assistant">
+    ```bash
+    python research_assistant.py
+    ```
+  </Step>
+</Steps>
+
+## Example Session
+
+```
+📚 Indexing research papers...
+
+✓ Indexed: Attention Is All You Need
+  Chunks: 67
+
+✓ Indexed: BERT: Pre-training of Deep Bidirectional Transformers
+  Chunks: 52
+
+✓ Indexed: Language Models are Few-Shot Learners
+  Chunks: 98
+
+✅ Total: 3 papers, 217 chunks indexed
+
+=== Research Assistant ===
+Commands:
+  'compare <aspect>' - Compare papers on an aspect
+  'find <topic>' - Find papers about a topic
+  'synthesize <question>' - Synthesize findings
+  'review <topic>' - Generate literature review
+  'stats' - Show statistics
+  'quit' - Exit
+
+Research> find attention mechanisms
+
+🔍 Finding papers about 'attention mechanisms'...
+
+1. Attention Is All You Need
+   Score: 0.956
+   Excerpt: The Transformer model architecture relies entirely on attention mechanisms...
+
+2. BERT: Pre-training of Deep Bidirectional Transformers
+   Score: 0.892
+   Excerpt: BERT uses multi-head self-attention in its architecture...
+
+Research> compare methodologies
+
+📊 Comparing papers...
+
+The three papers employ different methodologies for training large language models:
+
+1. **Attention Is All You Need** introduces the Transformer architecture using only 
+   attention mechanisms, trained on WMT translation tasks...
+
+2. **BERT** uses bidirectional training with masked language modeling and next sentence 
+   prediction objectives on BookCorpus and Wikipedia...
+
+3. **GPT-3** demonstrates few-shot learning by training a 175B parameter model on a 
+   diverse web corpus without task-specific fine-tuning...
+
+Research> quit
+
+Goodbye! 👋
+```
+
+## Specialized Features
+
+### Extract Paper Structure
+
+```python
+def extract_paper_structure(assistant: ResearchAssistant, paper_id: str) -> Dict:
+    """Extract structured information from a paper."""
+    return {
+        "abstract": assistant.extract_abstract(paper_id),
+        "methodology": assistant.extract_methodology(paper_id),
+        "findings": assistant.extract_findings(paper_id),
+        "limitations": assistant.extract_limitations(paper_id)
+    }
+```
+
+### Generate Citation Graph
+
+```python
+def build_citation_graph(assistant: ResearchAssistant) -> Dict:
+    """Build a graph of how papers cite each other."""
+    citations = {}
+    
+    for paper_id in assistant.papers:
+        query = f"What papers does {paper_id} cite or reference?"
+        response = assistant.rag.query(query)
+        
+        # Extract cited papers
+        # (This would require more sophisticated parsing)
+        citations[paper_id] = response.answer
+    
+    return citations
+```
+
+### Export Findings
+
+```python
+def export_to_markdown(findings: Dict, output_path: str):
+    """Export research findings to a markdown file."""
+    with open(output_path, 'w') as f:
+        f.write(f"# Research Synthesis\n\n")
+        f.write(f"## Question\n{findings['question']}\n\n")
+        f.write(f"## Findings\n{findings['synthesis']}\n\n")
+        f.write(f"## Supporting Papers\n")
+        for paper in findings['supporting_papers']:
+            f.write(f"- {paper}\n")
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Document Q&A" icon="comments" href="/examples/document-qa">
+    Build a Q&A system
+  </Card>
+  <Card title="Chatbot" icon="robot" href="/examples/chatbot">
+    Create a conversational interface
+  </Card>
+  <Card title="Hybrid Search" icon="magnifying-glass-plus" href="/features/hybrid-search">
+    Improve retrieval quality
+  </Card>
+  <Card title="Reranking" icon="ranking-star" href="/features/reranking">
+    Optimize result relevance
+  </Card>
+</CardGroup>
+
