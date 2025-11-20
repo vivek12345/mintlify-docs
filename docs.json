@@ -1,68 +1,101 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "Mini RAG Documentation",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#8B5CF6",
+    "light": "#A78BFA",
+    "dark": "#6D28D9"
   },
   "favicon": "/favicon.svg",
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Getting Started",
             "pages": [
               "index",
               "quickstart",
-              "development"
+              "installation"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Core Concepts",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "core/overview",
+              "core/document-loading",
+              "core/chunking",
+              "core/embeddings",
+              "core/vector-store"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "Features",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "features/agentic-rag",
+              "features/query-rewriting",
+              "features/reranking",
+              "features/hybrid-search",
+              "features/observability"
             ]
           },
           {
-            "group": "AI tools",
+            "group": "Guides",
             "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "guides/basic-usage",
+              "guides/configuration",
+              "guides/integration",
+              "guides/production"
+            ]
+          },
+          {
+            "group": "Examples",
+            "pages": [
+              "examples/document-qa",
+              "examples/chatbot",
+              "examples/research-assistant",
+              "examples/fastapi-integration"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "API Reference",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "API Documentation",
             "pages": [
               "api-reference/introduction"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Core Classes",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "api-reference/agentic-rag",
+              "api-reference/document-loader",
+              "api-reference/chunker",
+              "api-reference/embedding-model",
+              "api-reference/vector-store"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "api-reference/config/llm-config",
+              "api-reference/config/retrieval-config",
+              "api-reference/config/reranker-config",
+              "api-reference/config/observability-config"
+            ]
+          },
+          {
+            "group": "Rerankers",
+            "pages": [
+              "api-reference/rerankers/overview",
+              "api-reference/rerankers/cohere",
+              "api-reference/rerankers/sentence-transformer",
+              "api-reference/rerankers/llm"
             ]
           }
         ]
@@ -71,14 +104,19 @@
     "global": {
       "anchors": [
         {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
+          "anchor": "GitHub",
+          "href": "https://github.com/vivek12345/mini-rag",
+          "icon": "github"
         },
         {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
+          "anchor": "PyPI",
+          "href": "https://pypi.org/project/mini-rag/",
+          "icon": "python"
+        },
+        {
+          "anchor": "Community",
+          "href": "https://github.com/vivek12345/mini-rag/discussions",
+          "icon": "comments"
         }
       ]
     }
@@ -90,33 +128,32 @@
   "navbar": {
     "links": [
       {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
+        "label": "GitHub",
+        "href": "https://github.com/vivek12345/mini-rag"
       }
     ],
     "primary": {
       "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
+      "label": "Install",
+      "href": "/installation"
     }
   },
   "contextual": {
     "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
+      "copy",
+      "view",
+      "chatgpt",
+      "claude",
+      "perplexity",
+      "mcp",
+      "cursor",
+      "vscode"
+    ]
   },
   "footer": {
     "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
+      "github": "https://github.com/vivek12345/mini-rag",
+      "x": "https://x.com/viveknayyar"
     }
   }
 }

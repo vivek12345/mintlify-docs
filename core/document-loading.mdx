@@ -1,0 +1,284 @@
+---
+title: "Document Loading"
+description: "Load and parse documents from multiple file formats"
+---
+
+## Overview
+
+The `DocumentLoader` class provides a simple interface to load documents from various file formats. It uses **MarkItDown** under the hood, which supports:
+
+- PDF files
+- Word documents (DOCX, DOC)
+- PowerPoint presentations (PPTX, PPT)
+- Excel spreadsheets (XLSX, XLS)
+- Images with OCR (PNG, JPG, JPEG)
+- HTML and Markdown files
+- Plain text files
+
+## Basic Usage
+
+```python
+from mini.loader import DocumentLoader
+
+# Initialize loader
+loader = DocumentLoader()
+
+# Load a single document
+text = loader.load("document.pdf")
+print(f"Loaded {len(text)} characters")
+```
+
+## Loading Multiple Documents
+
+```python
+# Load multiple files
+texts = loader.load_documents([
+    "document1.pdf",
+    "document2.docx",
+    "presentation.pptx"
+])
+
+print(f"Loaded {len(texts)} documents")
+for i, text in enumerate(texts):
+    print(f"Document {i+1}: {len(text)} characters")
+```
+
+## Loading from Directory
+
+```python
+# Load all documents from a directory
+texts = loader.load_documents_from_directory("./knowledge_base/")
+
+print(f"Loaded {len(texts)} documents from directory")
+```
+
+<Tip>
+  The `load_documents_from_directory` method recursively scans the directory and loads all supported file formats.
+</Tip>
+
+## Supported File Formats
+
+<AccordionGroup>
+  <Accordion title="PDF Files (.pdf)">
+    Extracts text from PDF documents, including scanned PDFs with OCR.
+    
+    ```python
+    text = loader.load("report.pdf")
+    ```
+  </Accordion>
+
+  <Accordion title="Word Documents (.docx, .doc)">
+    Parses Microsoft Word documents and extracts formatted text.
+    
+    ```python
+    text = loader.load("proposal.docx")
+    ```
+  </Accordion>
+
+  <Accordion title="PowerPoint (.pptx, .ppt)">
+    Extracts text and notes from PowerPoint presentations.
+    
+    ```python
+    text = loader.load("presentation.pptx")
+    ```
+  </Accordion>
+
+  <Accordion title="Excel Spreadsheets (.xlsx, .xls)">
+    Reads data from Excel files, including multiple sheets.
+    
+    ```python
+    text = loader.load("data.xlsx")
+    ```
+  </Accordion>
+
+  <Accordion title="Images (.png, .jpg, .jpeg)">
+    Uses OCR to extract text from images.
+    
+    ```python
+    text = loader.load("screenshot.png")
+    ```
+  </Accordion>
+
+  <Accordion title="HTML and Markdown">
+    Parses HTML and Markdown files.
+    
+    ```python
+    text = loader.load("readme.md")
+    ```
+  </Accordion>
+
+  <Accordion title="Plain Text (.txt)">
+    Loads plain text files with proper encoding detection.
+    
+    ```python
+    text = loader.load("notes.txt")
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Integration with AgenticRAG
+
+When using `AgenticRAG`, document loading is handled automatically:
+
+```python
+from mini import AgenticRAG
+
+rag = AgenticRAG(vector_store=vector_store, embedding_model=embedding_model)
+
+# The loader is used internally
+rag.index_document("document.pdf")
+
+# Load multiple documents
+rag.index_documents([
+    "doc1.pdf",
+    "doc2.docx",
+    "doc3.pptx"
+])
+```
+
+## Advanced Usage
+
+### Custom Processing
+
+You can use the loader to get text and then apply custom processing:
+
+```python
+from mini.loader import DocumentLoader
+from mini.chunker import Chunker
+
+loader = DocumentLoader()
+chunker = Chunker()
+
+# Load and process
+text = loader.load("document.pdf")
+
+# Apply custom preprocessing
+text = text.replace("\n\n\n", "\n\n")  # Clean extra newlines
+text = text.strip()
+
+# Chunk the processed text
+chunks = chunker.chunk(text)
+```
+
+### Batch Loading with Metadata
+
+```python
+documents = [
+    {"path": "2023_report.pdf", "metadata": {"year": 2023, "type": "report"}},
+    {"path": "2024_report.pdf", "metadata": {"year": 2024, "type": "report"}},
+]
+
+for doc in documents:
+    text = loader.load(doc["path"])
+    # Process text with metadata
+    # ...
+```
+
+## Error Handling
+
+The document loader includes robust error handling:
+
+```python
+try:
+    text = loader.load("document.pdf")
+except FileNotFoundError:
+    print("Document not found")
+except Exception as e:
+    print(f"Error loading document: {e}")
+```
+
+<Warning>
+  Some file formats (especially scanned PDFs) may require additional system dependencies for OCR. Ensure you have the necessary libraries installed.
+</Warning>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="File Format Selection">
+    - Use text-based formats (TXT, MD) when possible for fastest loading
+    - PDFs work well but may be slower to process
+    - Images require OCR and may have accuracy limitations
+  </Accordion>
+
+  <Accordion title="Document Preprocessing">
+    - Clean documents before indexing (remove headers, footers, etc.)
+    - Ensure proper formatting for better chunking
+    - Remove unnecessary content that won't be useful for retrieval
+  </Accordion>
+
+  <Accordion title="Batch Processing">
+    - Load multiple documents in batches for efficiency
+    - Consider using multiprocessing for large document sets
+    - Monitor memory usage when loading many large documents
+  </Accordion>
+
+  <Accordion title="Error Handling">
+    - Always wrap document loading in try-except blocks
+    - Log failed documents for review
+    - Implement retry logic for transient failures
+  </Accordion>
+</AccordionGroup>
+
+## Performance Considerations
+
+| File Type | Speed | Accuracy | Notes |
+|-----------|-------|----------|-------|
+| TXT, MD | Fast | Perfect | Best for text-only content |
+| DOCX | Fast | Excellent | Handles formatting well |
+| PDF | Medium | Good | Depends on PDF type (text vs scanned) |
+| Images | Slow | Variable | Requires OCR, accuracy varies |
+| PPTX | Fast | Good | Extracts slide text and notes |
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="OCR not working for images">
+    **Solution:** Install required OCR dependencies:
+    
+    ```bash
+    # macOS
+    brew install tesseract
+    
+    # Ubuntu
+    sudo apt-get install tesseract-ocr
+    
+    # Windows
+    # Download from: https://github.com/UB-Mannheim/tesseract/wiki
+    ```
+  </Accordion>
+
+  <Accordion title="PDF loading fails">
+    **Solution:** Ensure you have the required PDF libraries:
+    
+    ```bash
+    pip install pymupdf  # or pdfplumber
+    ```
+  </Accordion>
+
+  <Accordion title="Encoding errors">
+    **Solution:** MarkItDown handles encoding automatically, but you can specify encoding if needed:
+    
+    ```python
+    # The library handles this internally
+    text = loader.load("document.txt")
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Chunking" icon="scissors" href="/core/chunking">
+    Learn how to chunk loaded documents
+  </Card>
+  <Card title="Embeddings" icon="wand-magic-sparkles" href="/core/embeddings">
+    Generate embeddings from chunks
+  </Card>
+  <Card title="AgenticRAG" icon="robot" href="/features/agentic-rag">
+    Use the complete RAG pipeline
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference/document-loader">
+    Complete API documentation
+  </Card>
+</CardGroup>
+

@@ -1,0 +1,398 @@
+---
+title: "Embeddings"
+description: "Generate vector embeddings for semantic search"
+---
+
+## Overview
+
+The `EmbeddingModel` class converts text into vector embeddings—numerical representations that capture semantic meaning. These embeddings enable:
+
+- **Semantic search**: Find conceptually similar content
+- **Similarity comparison**: Measure text relatedness
+- **Vector storage**: Store and retrieve content efficiently
+
+Mini RAG supports OpenAI, Azure OpenAI, and any OpenAI-compatible embedding API.
+
+## Basic Usage
+
+```python
+from mini.embedding import EmbeddingModel
+
+# Initialize with defaults (uses environment variables)
+embedding_model = EmbeddingModel()
+
+# Embed multiple chunks
+texts = ["First chunk", "Second chunk", "Third chunk"]
+embeddings = embedding_model.embed_chunks(texts)
+
+print(f"Generated {len(embeddings)} embeddings")
+print(f"Dimension: {len(embeddings[0])}")
+```
+
+## Configuration
+
+### Using Environment Variables
+
+The simplest approach uses environment variables:
+
+```bash .env
+OPENAI_API_KEY=sk-your-api-key
+EMBEDDING_MODEL=text-embedding-3-small
+OPENAI_BASE_URL=https://api.openai.com/v1  # Optional
+```
+
+```python
+from mini.embedding import EmbeddingModel
+
+# Reads from environment variables
+embedding_model = EmbeddingModel()
+```
+
+### Using EmbeddingConfig
+
+For more control, use `EmbeddingConfig`:
+
+```python
+from mini.embedding import EmbeddingConfig, EmbeddingModel
+
+config = EmbeddingConfig(
+    api_key="sk-your-api-key",
+    base_url="https://api.openai.com/v1",
+    model="text-embedding-3-small",
+    dimensions=1536,      # Optional: specify dimension
+    timeout=60.0,         # Request timeout
+    max_retries=3         # Retry failed requests
+)
+
+embedding_model = EmbeddingModel(config=config)
+```
+
+### Direct Initialization
+
+```python
+embedding_model = EmbeddingModel(
+    api_key="sk-your-api-key",
+    model="text-embedding-3-small",
+    base_url="https://api.openai.com/v1",
+    dimensions=1536
+)
+```
+
+## Supported Models
+
+### OpenAI Models
+
+```python
+# text-embedding-3-small (default, 1536 dimensions)
+embedding_model = EmbeddingModel(model="text-embedding-3-small")
+
+# text-embedding-3-large (3072 dimensions, higher quality)
+embedding_model = EmbeddingModel(model="text-embedding-3-large")
+
+# text-embedding-ada-002 (legacy, 1536 dimensions)
+embedding_model = EmbeddingModel(model="text-embedding-ada-002")
+```
+
+| Model | Dimensions | Cost | Best For |
+|-------|------------|------|----------|
+| text-embedding-3-small | 1536 | Lowest | General use, fast retrieval |
+| text-embedding-3-large | 3072 | Higher | High accuracy requirements |
+| text-embedding-ada-002 | 1536 | Medium | Legacy applications |
+
+### Azure OpenAI
+
+```python
+embedding_model = EmbeddingModel(
+    api_key="your-azure-key",
+    base_url="https://your-resource.openai.azure.com/openai/deployments/your-deployment",
+    model="text-embedding-ada-002"
+)
+```
+
+### Local or Self-Hosted Models
+
+Any OpenAI-compatible API works:
+
+```python
+# Using llama.cpp
+embedding_model = EmbeddingModel(
+    api_key="not-needed",
+    base_url="http://localhost:8080/v1",
+    model="your-model-name"
+)
+
+# Using Ollama
+embedding_model = EmbeddingModel(
+    api_key="not-needed",
+    base_url="http://localhost:11434/v1",
+    model="nomic-embed-text"
+)
+```
+
+## Embedding Operations
+
+### Embed Text Chunks
+
+```python
+chunks = ["First document chunk", "Second document chunk"]
+embeddings = embedding_model.embed_chunks(chunks)
+
+# Each embedding is a list of floats
+print(f"Embedding dimension: {len(embeddings[0])}")  # e.g., 1536
+```
+
+### Embed a Query
+
+```python
+query = "What is the budget for education?"
+query_embedding = embedding_model.embed_query(query)
+
+# Returns a single embedding vector
+print(f"Query embedding dimension: {len(query_embedding)}")
+```
+
+## Integration with AgenticRAG
+
+When using `AgenticRAG`, embedding is handled automatically:
+
+```python
+from mini import AgenticRAG, EmbeddingModel, VectorStore
+
+# Initialize
+embedding_model = EmbeddingModel()
+vector_store = VectorStore(
+    uri=os.getenv("MILVUS_URI"),
+    token=os.getenv("MILVUS_TOKEN"),
+    collection_name="docs",
+    dimension=1536  # Must match embedding dimension
+)
+
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model
+)
+
+# Embeddings are generated automatically
+rag.index_document("document.pdf")
+response = rag.query("What is this about?")
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Model Selection">
+    **Choose the right model for your use case:**
+    
+    - **text-embedding-3-small**: Best balance of cost and performance
+    - **text-embedding-3-large**: When accuracy is critical
+    - **Local models**: When data privacy is required
+    
+    ```python
+    # For most use cases
+    embedding_model = EmbeddingModel(model="text-embedding-3-small")
+    ```
+  </Accordion>
+
+  <Accordion title="Dimension Matching">
+    **Ensure dimensions match between embeddings and vector store:**
+    
+    ```python
+    # Embedding model dimension
+    embedding_model = EmbeddingModel(model="text-embedding-3-small")  # 1536
+    
+    # Vector store must match
+    vector_store = VectorStore(
+        uri=os.getenv("MILVUS_URI"),
+        token=os.getenv("MILVUS_TOKEN"),
+        collection_name="docs",
+        dimension=1536  # Must match!
+    )
+    ```
+  </Accordion>
+
+  <Accordion title="Batch Processing">
+    **Process multiple texts in batches for efficiency:**
+    
+    ```python
+    # Good: Batch processing
+    embeddings = embedding_model.embed_chunks(chunks)
+    
+    # Bad: Individual processing
+    # embeddings = [embedding_model.embed_query(c) for c in chunks]
+    ```
+  </Accordion>
+
+  <Accordion title="Error Handling">
+    **Handle API failures gracefully:**
+    
+    ```python
+    try:
+        embeddings = embedding_model.embed_chunks(chunks)
+    except Exception as e:
+        print(f"Error generating embeddings: {e}")
+        # Implement retry logic or fallback
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Advanced Usage
+
+### Custom Dimensions
+
+Some models support custom dimensions:
+
+```python
+# Reduce dimensions for faster search (3-large only)
+embedding_model = EmbeddingModel(
+    model="text-embedding-3-large",
+    dimensions=1536  # Reduce from 3072
+)
+```
+
+### Timeout and Retry Configuration
+
+```python
+from mini.embedding import EmbeddingConfig, EmbeddingModel
+
+config = EmbeddingConfig(
+    api_key=os.getenv("OPENAI_API_KEY"),
+    model="text-embedding-3-small",
+    timeout=120.0,      # 2 minute timeout
+    max_retries=5       # Retry up to 5 times
+)
+
+embedding_model = EmbeddingModel(config=config)
+```
+
+### Using with Custom Pipelines
+
+```python
+from mini.loader import DocumentLoader
+from mini.chunker import Chunker
+from mini.embedding import EmbeddingModel
+
+# Build custom pipeline
+loader = DocumentLoader()
+chunker = Chunker()
+embedding_model = EmbeddingModel()
+
+# Process document
+text = loader.load("document.pdf")
+chunks = chunker.chunk(text)
+chunk_texts = [c.text for c in chunks]
+
+# Generate embeddings
+embeddings = embedding_model.embed_chunks(chunk_texts)
+
+# Now store in vector database
+# ...
+```
+
+## Performance Considerations
+
+<CardGroup cols={2}>
+  <Card title="Batch Size" icon="layer-group">
+    Process 100-500 chunks per batch for optimal performance
+  </Card>
+  <Card title="Rate Limits" icon="gauge">
+    Respect API rate limits (handled automatically with retries)
+  </Card>
+  <Card title="Caching" icon="database">
+    Cache embeddings for frequently accessed content
+  </Card>
+  <Card title="Model Choice" icon="brain">
+    Smaller models are faster; larger models are more accurate
+  </Card>
+</CardGroup>
+
+## Cost Optimization
+
+| Model | Price per 1M tokens | 10K chunks (~1M tokens) |
+|-------|---------------------|-------------------------|
+| text-embedding-3-small | $0.02 | ~$0.02 |
+| text-embedding-3-large | $0.13 | ~$0.13 |
+| text-embedding-ada-002 | $0.10 | ~$0.10 |
+
+<Tip>
+  For most applications, `text-embedding-3-small` offers the best balance of cost and quality.
+</Tip>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Authentication errors">
+    **Solution:** Verify your API key:
+    
+    ```bash
+    echo $OPENAI_API_KEY
+    ```
+    
+    Or check your configuration:
+    
+    ```python
+    print(embedding_model.client.api_key)
+    ```
+  </Accordion>
+
+  <Accordion title="Dimension mismatch">
+    **Solution:** Ensure vector store dimension matches embedding dimension:
+    
+    ```python
+    # Check embedding dimension
+    test_embedding = embedding_model.embed_query("test")
+    print(f"Embedding dimension: {len(test_embedding)}")
+    
+    # Create vector store with matching dimension
+    vector_store = VectorStore(
+        uri=os.getenv("MILVUS_URI"),
+        token=os.getenv("MILVUS_TOKEN"),
+        collection_name="docs",
+        dimension=len(test_embedding)
+    )
+    ```
+  </Accordion>
+
+  <Accordion title="Rate limit errors">
+    **Solution:** The library handles retries automatically, but you can adjust:
+    
+    ```python
+    config = EmbeddingConfig(
+        max_retries=5,
+        timeout=120.0
+    )
+    ```
+  </Accordion>
+
+  <Accordion title="Slow embedding generation">
+    **Solution:** Use a smaller model or batch process:
+    
+    ```python
+    # Use smaller model
+    embedding_model = EmbeddingModel(model="text-embedding-3-small")
+    
+    # Process in batches
+    batch_size = 100
+    for i in range(0, len(chunks), batch_size):
+        batch = chunks[i:i+batch_size]
+        embeddings = embedding_model.embed_chunks(batch)
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Vector Store" icon="database" href="/core/vector-store">
+    Store and search embeddings
+  </Card>
+  <Card title="AgenticRAG" icon="robot" href="/features/agentic-rag">
+    Use the complete RAG pipeline
+  </Card>
+  <Card title="Hybrid Search" icon="magnifying-glass" href="/features/hybrid-search">
+    Combine semantic and keyword search
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference/embedding-model">
+    Complete API documentation
+  </Card>
+</CardGroup>
+

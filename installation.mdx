@@ -1,0 +1,307 @@
+---
+title: "Installation"
+description: "Install Mini RAG and set up your development environment"
+---
+
+## Prerequisites
+
+Before installing Mini RAG, ensure you have:
+
+<CardGroup cols={2}>
+  <Card title="Python >= 3.11" icon="python">
+    Mini RAG requires Python 3.11 or higher
+  </Card>
+  <Card title="OpenAI API Key" icon="key">
+    For embeddings and LLM generation (or compatible API)
+  </Card>
+  <Card title="Milvus Instance" icon="database">
+    Local or cloud instance for vector storage
+  </Card>
+  <Card title="Package Manager" icon="box">
+    uv (recommended), pip, or poetry
+  </Card>
+</CardGroup>
+
+## Install Mini RAG
+
+### Using uv (Recommended)
+
+[uv](https://github.com/astral-sh/uv) is a fast Python package installer and resolver:
+
+```bash
+uv add mini-rag
+```
+
+### Using pip
+
+```bash
+pip install mini-rag
+```
+
+### Using poetry
+
+```bash
+poetry add mini-rag
+```
+
+## Install from Source
+
+For development or to use the latest features:
+
+<Tabs>
+  <Tab title="Using uv">
+    ```bash
+    # Clone the repository
+    git clone https://github.com/vivek12345/mini-rag.git
+    cd mini-rag
+
+    # Install dependencies
+    uv sync
+    ```
+  </Tab>
+  
+  <Tab title="Using pip">
+    ```bash
+    # Clone the repository
+    git clone https://github.com/vivek12345/mini-rag.git
+    cd mini-rag
+
+    # Install in editable mode
+    pip install -e .
+    ```
+  </Tab>
+</Tabs>
+
+## Dependencies
+
+Mini RAG automatically installs the following dependencies:
+
+| Package | Version | Purpose |
+|---------|---------|---------|
+| `chonkie` | >=1.4.1 | Smart text chunking with multiple strategies |
+| `cohere` | >=5.0.0 | Cohere API for advanced re-ranking |
+| `markitdown` | >=0.1.3 | Multi-format document loading (PDF, DOCX, images) |
+| `pydantic` | >=2.12.4 | Data validation and settings management |
+| `pymilvus` | >=2.5.0 | Vector database client for similarity search |
+| `python-dotenv` | >=1.2.1 | Environment variable management |
+| `sentence-transformers` | >=2.2.0 | Local cross-encoder models for re-ranking |
+| `langfuse` | >=2.0.0 | Observability and tracing |
+| `openai` | >=1.0.0 | OpenAI API client for embeddings and LLMs |
+
+## Set Up Milvus
+
+Mini RAG uses Milvus as its vector database. Choose one of these options:
+
+### Option 1: Zilliz Cloud (Recommended for Beginners)
+
+The easiest way to get started with Milvus:
+
+<Steps>
+  <Step title="Sign Up">
+    Create a free account at [cloud.zilliz.com](https://cloud.zilliz.com/)
+  </Step>
+  <Step title="Create Cluster">
+    Create a new cluster (free tier available)
+  </Step>
+  <Step title="Get Credentials">
+    Copy your cluster URI and API token
+  </Step>
+  <Step title="Add to .env">
+    Add credentials to your `.env` file
+  </Step>
+</Steps>
+
+### Option 2: Local Milvus with Docker
+
+Run Milvus locally using Docker:
+
+```bash
+# Download docker-compose configuration
+wget https://github.com/milvus-io/milvus/releases/download/v2.3.0/milvus-standalone-docker-compose.yml -O docker-compose.yml
+
+# Start Milvus
+docker-compose up -d
+
+# Your Milvus instance will be available at:
+# URI: http://localhost:19530
+```
+
+<Note>
+  For local Milvus, you don't need a token. Just set `MILVUS_URI=http://localhost:19530`
+</Note>
+
+### Option 3: Milvus on Kubernetes
+
+For production deployments, see the [Milvus Kubernetes documentation](https://milvus.io/docs/install_cluster-milvusoperator.md).
+
+## Configure Environment Variables
+
+Create a `.env` file in your project root:
+
+```bash .env
+# ============================================
+# OpenAI Configuration (Required)
+# ============================================
+OPENAI_API_KEY=sk-your-api-key-here
+OPENAI_BASE_URL=https://api.openai.com/v1  # Optional
+EMBEDDING_MODEL=text-embedding-3-small
+
+# ============================================
+# Milvus Configuration (Required)
+# ============================================
+MILVUS_URI=https://your-milvus-instance.com
+MILVUS_TOKEN=your-milvus-token
+
+# ============================================
+# Optional: Cohere (for Cohere re-ranking)
+# ============================================
+COHERE_API_KEY=your-cohere-api-key
+
+# ============================================
+# Optional: Langfuse (for observability)
+# ============================================
+LANGFUSE_PUBLIC_KEY=pk-lf-...
+LANGFUSE_SECRET_KEY=sk-lf-...
+LANGFUSE_HOST=https://cloud.langfuse.com
+```
+
+<Accordion title="Using Azure OpenAI?">
+  If you're using Azure OpenAI, configure your environment like this:
+
+  ```bash
+  OPENAI_API_KEY=your-azure-api-key
+  OPENAI_BASE_URL=https://your-resource.openai.azure.com/openai/deployments/your-deployment
+  EMBEDDING_MODEL=text-embedding-ada-002
+  ```
+</Accordion>
+
+<Accordion title="Using a Local LLM?">
+  Mini RAG works with any OpenAI-compatible API (e.g., llama.cpp, Ollama):
+
+  ```bash
+  OPENAI_API_KEY=not-needed
+  OPENAI_BASE_URL=http://localhost:8080/v1
+  EMBEDDING_MODEL=your-model-name
+  ```
+</Accordion>
+
+## Verify Installation
+
+Test that Mini RAG is installed correctly:
+
+```python test_installation.py
+from mini import AgenticRAG, EmbeddingModel, VectorStore
+
+print("✅ Mini RAG imported successfully!")
+print(f"📦 Version: {AgenticRAG.__module__}")
+```
+
+Run the test:
+
+```bash
+python test_installation.py
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="ImportError: No module named 'mini'">
+    **Solution:** Ensure Mini RAG is installed in your current Python environment:
+    
+    ```bash
+    pip list | grep mini-rag
+    ```
+    
+    If not listed, reinstall:
+    
+    ```bash
+    pip install mini-rag
+    ```
+  </Accordion>
+
+  <Accordion title="Connection error to Milvus">
+    **Solution:** Check your Milvus configuration:
+    
+    1. Verify `MILVUS_URI` is correct
+    2. Ensure Milvus is running (if using Docker: `docker ps`)
+    3. Check network connectivity
+    4. Verify token/credentials are correct
+  </Accordion>
+
+  <Accordion title="OpenAI API authentication error">
+    **Solution:** Verify your API key:
+    
+    1. Check `OPENAI_API_KEY` is set correctly
+    2. Ensure key has not expired
+    3. Verify key has required permissions
+    4. Test key with a simple OpenAI API call
+  </Accordion>
+
+  <Accordion title="Python version error">
+    **Solution:** Mini RAG requires Python 3.11+:
+    
+    ```bash
+    python --version
+    ```
+    
+    If you need to upgrade, use [pyenv](https://github.com/pyenv/pyenv) or download from [python.org](https://python.org).
+  </Accordion>
+
+  <Accordion title="Dependency conflicts">
+    **Solution:** Create a fresh virtual environment:
+    
+    ```bash
+    python -m venv venv
+    source venv/bin/activate  # On Windows: venv\Scripts\activate
+    pip install mini-rag
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Optional: Install Development Tools
+
+If you're planning to contribute or develop with Mini RAG:
+
+```bash
+# Clone repository
+git clone https://github.com/vivek12345/mini-rag.git
+cd mini-rag
+
+# Install with development dependencies
+uv sync --all-extras
+
+# Install pre-commit hooks (optional)
+pre-commit install
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Build your first RAG application
+  </Card>
+  <Card title="Core Concepts" icon="book" href="/core/overview">
+    Learn about Mini RAG's architecture
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference/introduction">
+    Explore the complete API
+  </Card>
+  <Card title="Examples" icon="lightbulb" href="/examples/document-qa">
+    See practical examples
+  </Card>
+</CardGroup>
+
+## Getting Help
+
+<CardGroup cols={3}>
+  <Card title="GitHub Issues" icon="github" href="https://github.com/vivek12345/mini-rag/issues">
+    Report installation problems
+  </Card>
+  <Card title="Discussions" icon="comments" href="https://github.com/vivek12345/mini-rag/discussions">
+    Ask questions
+  </Card>
+  <Card title="Documentation" icon="book" href="/core/overview">
+    Read the docs
+  </Card>
+</CardGroup>
+

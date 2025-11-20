@@ -1,0 +1,501 @@
+---
+title: "Observability"
+description: "Monitor and trace your RAG pipeline with Langfuse integration"
+---
+
+## Overview
+
+Mini RAG includes built-in observability through **Langfuse**, allowing you to:
+
+- **Track operations**: Monitor indexing, queries, and all pipeline steps
+- **Measure performance**: Analyze latency, token usage, and costs
+- **Debug issues**: View detailed traces with inputs/outputs
+- **Optimize quality**: Understand what's working and what's not
+
+## Quick Start
+
+<Steps>
+  <Step title="Get Langfuse Account">
+    Sign up for free at [cloud.langfuse.com](https://cloud.langfuse.com)
+  </Step>
+  
+  <Step title="Get API Keys">
+    Create a new project and copy your API keys
+  </Step>
+  
+  <Step title="Configure Environment">
+    Add keys to your `.env` file:
+    
+    ```bash .env
+    LANGFUSE_PUBLIC_KEY=pk-lf-...
+    LANGFUSE_SECRET_KEY=sk-lf-...
+    LANGFUSE_HOST=https://cloud.langfuse.com
+    ```
+  </Step>
+  
+  <Step title="Enable in Code">
+    ```python
+    from mini import AgenticRAG, ObservabilityConfig
+    
+    rag = AgenticRAG(
+        vector_store=vector_store,
+        embedding_model=embedding_model,
+        observability_config=ObservabilityConfig(enabled=True)
+    )
+    ```
+  </Step>
+</Steps>
+
+## Configuration
+
+### Using Environment Variables
+
+```python
+from mini import ObservabilityConfig
+
+# Reads from environment variables
+observability_config = ObservabilityConfig(
+    enabled=True
+)
+
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    observability_config=observability_config
+)
+```
+
+### Explicit Configuration
+
+```python
+import os
+from mini import ObservabilityConfig
+
+observability_config = ObservabilityConfig(
+    enabled=True,
+    public_key=os.getenv("LANGFUSE_PUBLIC_KEY"),
+    secret_key=os.getenv("LANGFUSE_SECRET_KEY"),
+    host="https://cloud.langfuse.com"
+)
+
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    observability_config=observability_config
+)
+```
+
+### Disabling Observability
+
+```python
+# Default: disabled
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model
+    # observability_config not specified = disabled
+)
+
+# Explicit disable
+observability_config = ObservabilityConfig(enabled=False)
+```
+
+## What Gets Tracked
+
+When observability is enabled, Mini RAG automatically traces:
+
+<CardGroup cols={2}>
+  <Card title="Query Operations" icon="magnifying-glass">
+    - Query input
+    - Query rewriting
+    - Generated variations
+    - Retrieval results
+    - Re-ranking scores
+    - Final answer
+    - Response metadata
+  </Card>
+  
+  <Card title="Indexing Operations" icon="file-import">
+    - Document loading
+    - Chunking process
+    - Embedding generation
+    - Vector storage
+    - Chunk counts
+    - Processing time
+  </Card>
+  
+  <Card title="Performance Metrics" icon="gauge">
+    - Latency per step
+    - Total query time
+    - Token usage
+    - API calls
+    - Costs
+  </Card>
+  
+  <Card title="LLM Interactions" icon="brain">
+    - Model used
+    - Prompts sent
+    - Responses received
+    - Token counts
+    - Temperature settings
+  </Card>
+</CardGroup>
+
+## Langfuse Dashboard
+
+Once enabled, view traces in the Langfuse dashboard:
+
+### Traces View
+
+See all operations in a timeline:
+
+```
+Query Trace
+├── Query Rewriting (50ms, $0.0001)
+│   ├── Input: "What is the budget?"
+│   └── Output: ["How much funding...", "Budget allocation..."]
+├── Embedding (30ms, $0.0001)
+├── Vector Search (20ms, free)
+├── Re-ranking (100ms, $0.0003)
+└── Answer Generation (500ms, $0.002)
+    ├── Context: [3 chunks]
+    └── Answer: "The budget is..."
+
+Total: 700ms, $0.0025
+```
+
+### Metrics View
+
+Track aggregate metrics:
+
+- **Query count**: Number of queries per day/week/month
+- **Average latency**: Mean response time
+- **Cost tracking**: Total API costs
+- **Token usage**: Tokens consumed
+- **Error rates**: Failed operations
+
+### Sessions View
+
+Group related queries:
+
+```python
+# Queries are automatically grouped by session
+response1 = rag.query("What is the budget?")
+response2 = rag.query("How does it compare to last year?")
+response3 = rag.query("What are the major expenses?")
+
+# View as a session in Langfuse dashboard
+```
+
+## Use Cases
+
+### Debugging Poor Answers
+
+```python
+observability_config = ObservabilityConfig(enabled=True)
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    observability_config=observability_config
+)
+
+response = rag.query("What is the budget?")
+
+# Check Langfuse dashboard:
+# - Were good chunks retrieved?
+# - Did reranking help or hurt?
+# - Was the LLM prompt appropriate?
+# - Did query rewriting generate good variations?
+```
+
+### Performance Optimization
+
+```python
+# Enable observability to measure
+observability_config = ObservabilityConfig(enabled=True)
+
+# Test different configurations
+configs = [
+    RetrievalConfig(top_k=5),
+    RetrievalConfig(top_k=10),
+    RetrievalConfig(top_k=15)
+]
+
+for config in configs:
+    rag = AgenticRAG(
+        vector_store=vector_store,
+        embedding_model=embedding_model,
+        retrieval_config=config,
+        observability_config=observability_config
+    )
+    
+    response = rag.query("Test query")
+    
+# Compare latency and quality in Langfuse
+```
+
+### Cost Tracking
+
+```python
+# Track costs across different setups
+observability_config = ObservabilityConfig(enabled=True)
+
+# Monitor costs in Langfuse:
+# - LLM API calls
+# - Embedding API calls
+# - Re-ranking API calls (if using Cohere)
+# - Total cost per query
+# - Cost trends over time
+```
+
+### Quality Monitoring
+
+```python
+# Track retrieval quality
+observability_config = ObservabilityConfig(enabled=True)
+
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    observability_config=observability_config
+)
+
+# In Langfuse, monitor:
+# - Retrieval scores
+# - Reranking improvements
+# - Context relevance
+# - Answer quality (with user feedback)
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Enable in Development">
+    **Always use observability during development:**
+    
+    ```python
+    import os
+    
+    # Enable based on environment
+    is_dev = os.getenv("ENVIRONMENT") == "development"
+    
+    observability_config = ObservabilityConfig(
+        enabled=is_dev
+    )
+    ```
+  </Accordion>
+
+  <Accordion title="Sample in Production">
+    **Sample traces in production to reduce overhead:**
+    
+    ```python
+    import random
+    
+    # Sample 10% of queries
+    sample_rate = 0.1
+    
+    observability_config = ObservabilityConfig(
+        enabled=random.random() < sample_rate
+    )
+    ```
+    
+    Note: Langfuse also supports sampling at the platform level.
+  </Accordion>
+
+  <Accordion title="Add User Feedback">
+    **Collect user feedback in Langfuse:**
+    
+    After getting responses, you can add feedback through Langfuse SDK:
+    
+    ```python
+    from langfuse import Langfuse
+    
+    langfuse = Langfuse()
+    
+    # Add user feedback
+    langfuse.score(
+        name="user_feedback",
+        value=1,  # 1 for positive, 0 for negative
+        trace_id=trace_id
+    )
+    ```
+  </Accordion>
+
+  <Accordion title="Use Tags and Metadata">
+    **Organize traces with tags:**
+    
+    Langfuse automatically captures metadata from Mini RAG operations. You can add custom tags through the Langfuse SDK.
+  </Accordion>
+</AccordionGroup>
+
+## Performance Impact
+
+Observability has minimal performance impact:
+
+| Operation | Overhead | Impact |
+|-----------|----------|--------|
+| Query trace | ~5-10ms | Negligible |
+| Indexing trace | ~10-20ms | Negligible |
+| Network calls | Async | Non-blocking |
+| Data collection | Minimal | < 1% CPU |
+
+**Recommendation:** Enable in all environments, use sampling in high-traffic production.
+
+## Privacy & Security
+
+<AccordionGroup>
+  <Accordion title="Data Sent to Langfuse">
+    **What's sent:**
+    - Query text
+    - Retrieved chunks
+    - LLM responses
+    - Metadata and scores
+    
+    **What's NOT sent:**
+    - API keys (stored encrypted)
+    - Vector embeddings
+    - Raw documents
+  </Accordion>
+
+  <Accordion title="Self-Hosting">
+    **Langfuse can be self-hosted:**
+    
+    ```python
+    observability_config = ObservabilityConfig(
+        enabled=True,
+        host="https://your-langfuse-instance.com"
+    )
+    ```
+    
+    See [Langfuse self-hosting docs](https://langfuse.com/docs/deployment/self-host) for setup.
+  </Accordion>
+
+  <Accordion title="Disabling for Sensitive Data">
+    **Disable for sensitive content:**
+    
+    ```python
+    # Conditional observability
+    has_sensitive_data = check_for_pii(query)
+    
+    observability_config = ObservabilityConfig(
+        enabled=not has_sensitive_data
+    )
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Traces not appearing">
+    **Solution:** Check your API keys:
+    
+    ```bash
+    echo $LANGFUSE_PUBLIC_KEY
+    echo $LANGFUSE_SECRET_KEY
+    ```
+    
+    Ensure they're valid and have correct permissions.
+  </Accordion>
+
+  <Accordion title="Connection errors">
+    **Solution:** Verify Langfuse host:
+    
+    ```python
+    observability_config = ObservabilityConfig(
+        enabled=True,
+        host="https://cloud.langfuse.com"  # Correct URL
+    )
+    ```
+    
+    Check network connectivity and firewall rules.
+  </Accordion>
+
+  <Accordion title="Missing trace data">
+    **Solution:** Some operations may not be traced if they fail early. Check:
+    
+    1. Operation completed successfully
+    2. Langfuse SDK is up to date
+    3. No network interruptions
+  </Accordion>
+
+  <Accordion title="High latency">
+    **Solution:** Langfuse calls are async, but if you experience issues:
+    
+    1. Check network latency to Langfuse
+    2. Consider self-hosting closer to your infrastructure
+    3. Use sampling to reduce trace volume
+  </Accordion>
+</AccordionGroup>
+
+## Advanced Features
+
+### Custom Spans
+
+You can add custom spans using the Langfuse SDK:
+
+```python
+from langfuse import Langfuse
+
+langfuse = Langfuse()
+
+# Create custom span
+with langfuse.span(name="custom_processing") as span:
+    # Your custom processing
+    result = process_data(data)
+    span.end(output=result)
+```
+
+### Experiments
+
+Compare different configurations:
+
+```python
+# Tag traces with experiment name
+# (Use Langfuse SDK for custom tagging)
+
+# Configuration A
+rag_a = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    retrieval_config=RetrievalConfig(top_k=5),
+    observability_config=ObservabilityConfig(enabled=True)
+)
+
+# Configuration B
+rag_b = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    retrieval_config=RetrievalConfig(top_k=10),
+    observability_config=ObservabilityConfig(enabled=True)
+)
+
+# Compare in Langfuse dashboard
+```
+
+### Datasets
+
+Use Langfuse datasets to track evaluation metrics:
+
+```python
+# Create test dataset in Langfuse
+# Run queries and compare results
+# Track metrics over time
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Langfuse Documentation" icon="book" href="https://langfuse.com/docs">
+    Learn more about Langfuse features
+  </Card>
+  <Card title="AgenticRAG" icon="robot" href="/features/agentic-rag">
+    Complete RAG pipeline documentation
+  </Card>
+  <Card title="Production Guide" icon="rocket" href="/guides/production">
+    Deploy Mini RAG to production
+  </Card>
+  <Card title="Examples" icon="lightbulb" href="/examples/document-qa">
+    See observability in action
+  </Card>
+</CardGroup>
+

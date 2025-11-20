@@ -1,80 +1,294 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: "Quick Start"
+description: "Build your first RAG application with Mini RAG in minutes"
 ---
 
-## Get started in three steps
+## Overview
 
-Get your documentation site running locally and make your first customization.
+This guide will walk you through building a complete RAG (Retrieval-Augmented Generation) application using Mini RAG. You'll learn how to:
 
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+- Set up your environment
+- Index documents
+- Query your knowledge base
+- Access and use retrieved sources
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  **Prerequisites:** Python >= 3.11, OpenAI API key, and a Milvus instance (local or cloud)
 </Note>
+
+## Step 1: Installation
+
+Install Mini RAG using your preferred package manager:
+
+<CodeGroup>
+
+```bash uv
+uv add mini-rag
+```
+
+```bash pip
+pip install mini-rag
+```
+
+</CodeGroup>
+
+## Step 2: Environment Setup
+
+Create a `.env` file in your project directory with the required credentials:
+
+```bash .env
+# OpenAI Configuration
+OPENAI_API_KEY=sk-your-api-key-here
+OPENAI_BASE_URL=https://api.openai.com/v1  # Optional
+EMBEDDING_MODEL=text-embedding-3-small
+
+# Milvus Configuration
+MILVUS_URI=https://your-milvus-instance.com
+MILVUS_TOKEN=your-milvus-token
+
+# Optional: Cohere for re-ranking
+COHERE_API_KEY=your-cohere-api-key
+
+# Optional: Langfuse for observability
+LANGFUSE_PUBLIC_KEY=pk-lf-...
+LANGFUSE_SECRET_KEY=sk-lf-...
+LANGFUSE_HOST=https://cloud.langfuse.com
+```
+
+<Tip>
+  Don't have a Milvus instance? Get started quickly with [Zilliz Cloud](https://cloud.zilliz.com/) (free tier available) or run [Milvus locally with Docker](https://milvus.io/docs/install_standalone-docker.md).
+</Tip>
+
+## Step 3: Basic Usage
+
+Create your first RAG application:
+
+```python app.py
+import os
+from mini import (
+    AgenticRAG,
+    EmbeddingModel,
+    VectorStore
+)
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Initialize components
+embedding_model = EmbeddingModel()
+
+vector_store = VectorStore(
+    uri=os.getenv("MILVUS_URI"),
+    token=os.getenv("MILVUS_TOKEN"),
+    collection_name="my_documents",
+    dimension=1536  # For text-embedding-3-small
+)
+
+# Initialize RAG system
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model
+)
+
+# Index a document
+print("📄 Indexing document...")
+num_chunks = rag.index_document("path/to/your/document.pdf")
+print(f"✅ Indexed {num_chunks} chunks")
+
+# Query the system
+print("\n🔍 Querying...")
+response = rag.query("What is the main topic of the document?")
+
+# Display results
+print(f"\n💬 Answer:\n{response.answer}")
+print(f"\n📚 Sources: {len(response.retrieved_chunks)} chunks used")
+```
+
+Run your application:
+
+```bash
+python app.py
+```
+
+## Step 4: Advanced Configuration
+
+Enhance your RAG system with advanced features:
+
+```python advanced_app.py
+import os
+from mini import (
+    AgenticRAG,
+    LLMConfig,
+    RetrievalConfig,
+    RerankerConfig,
+    EmbeddingModel,
+    VectorStore
+)
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Initialize with custom configuration
+embedding_model = EmbeddingModel()
+
+vector_store = VectorStore(
+    uri=os.getenv("MILVUS_URI"),
+    token=os.getenv("MILVUS_TOKEN"),
+    collection_name="my_documents",
+    dimension=1536
+)
+
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    # Configure LLM
+    llm_config=LLMConfig(
+        model="gpt-4o-mini",
+        temperature=0.7
+    ),
+    # Configure retrieval
+    retrieval_config=RetrievalConfig(
+        top_k=10,              # Retrieve 10 chunks initially
+        rerank_top_k=3,        # Keep top 3 after re-ranking
+        use_query_rewriting=True,  # Generate query variations
+        use_reranking=True,    # Re-rank results
+        use_hybrid_search=True # Use semantic + BM25 search
+    ),
+    # Configure re-ranker
+    reranker_config=RerankerConfig(
+        type="llm"  # Options: "llm", "cohere", "sentence-transformer"
+    )
+)
+
+# Index multiple documents
+documents = [
+    "document1.pdf",
+    "document2.docx",
+    "document3.txt"
+]
+
+print("📄 Indexing documents...")
+total_chunks = rag.index_documents(documents)
+print(f"✅ Indexed {total_chunks} total chunks")
+
+# Query with detailed response
+response = rag.query(
+    query="What are the key findings?",
+    return_sources=True
+)
+
+# Access response details
+print(f"\n💬 Answer:\n{response.answer}")
+print(f"\n🔄 Query variations: {response.rewritten_queries}")
+print(f"\n📊 Metadata: {response.metadata}")
+
+# Show source chunks
+print(f"\n📚 Retrieved {len(response.retrieved_chunks)} chunks:")
+for i, chunk in enumerate(response.retrieved_chunks, 1):
+    print(f"\n{i}. [Score: {chunk.reranked_score:.4f}]")
+    print(f"   Text: {chunk.text[:150]}...")
+    print(f"   Source: {chunk.metadata}")
+```
+
+## Step 5: Enable Observability
+
+Track and monitor your RAG pipeline with Langfuse:
+
+```python with_observability.py
+from mini import (
+    AgenticRAG,
+    ObservabilityConfig,
+    EmbeddingModel,
+    VectorStore
+)
+
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    # Enable observability
+    observability_config=ObservabilityConfig(enabled=True)
+)
+
+# All operations are now traced in Langfuse
+rag.index_document("document.pdf")
+response = rag.query("What is this about?")
+```
+
+<Card title="View traces in Langfuse" icon="chart-line" href="https://cloud.langfuse.com">
+  Monitor query rewriting, retrieval, re-ranking, and LLM generation in real-time
+</Card>
+
+## Common Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Document Q&A" icon="comments" href="/examples/document-qa">
+    Build a question-answering system over your documents
+  </Card>
+  <Card title="Chatbot" icon="robot" href="/examples/chatbot">
+    Create an intelligent chatbot with document context
+  </Card>
+  <Card title="Research Assistant" icon="graduation-cap" href="/examples/research-assistant">
+    Analyze and extract insights from research papers
+  </Card>
+  <Card title="FastAPI Integration" icon="bolt" href="/examples/fastapi-integration">
+    Deploy as a REST API with FastAPI
+  </Card>
+</CardGroup>
+
+## What You've Learned
+
+<AccordionGroup>
+  <Accordion title="Basic Setup">
+    - How to install and configure Mini RAG
+    - Setting up environment variables
+    - Initializing core components
+  </Accordion>
+  
+  <Accordion title="Document Indexing">
+    - How to index single and multiple documents
+    - Understanding document chunking
+    - Managing your knowledge base
+  </Accordion>
+  
+  <Accordion title="Querying">
+    - How to query your RAG system
+    - Accessing retrieved sources
+    - Understanding response structure
+  </Accordion>
+  
+  <Accordion title="Advanced Features">
+    - Configuring query rewriting
+    - Enabling hybrid search
+    - Using different re-ranking strategies
+    - Monitoring with observability
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<Steps>
+  <Step title="Explore Core Concepts">
+    Learn about [document loading](/core/document-loading), [chunking](/core/chunking), and [embeddings](/core/embeddings)
+  </Step>
+  <Step title="Learn About Features">
+    Discover [hybrid search](/features/hybrid-search), [re-ranking](/features/reranking), and more
+  </Step>
+  <Step title="Check API Reference">
+    Browse the complete [API documentation](/api-reference/introduction)
+  </Step>
+  <Step title="Build Something">
+    Try one of our [example projects](/examples/document-qa)
+  </Step>
+</Steps>
+
+## Need Help?
+
+<CardGroup cols={2}>
+  <Card title="GitHub Issues" icon="github" href="https://github.com/vivek12345/mini-rag/issues">
+    Report bugs or request features
+  </Card>
+  <Card title="Discussions" icon="comments" href="https://github.com/vivek12345/mini-rag/discussions">
+    Ask questions and share ideas
+  </Card>
+</CardGroup>

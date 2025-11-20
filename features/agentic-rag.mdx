@@ -1,0 +1,564 @@
+---
+title: "Agentic RAG"
+description: "Intelligent RAG with query rewriting, retrieval, and re-ranking"
+---
+
+## Overview
+
+`AgenticRAG` is the complete RAG system that orchestrates all components into an intelligent pipeline. It's called "agentic" because it makes smart decisions about:
+
+- **Query optimization**: Automatically rewrites queries for better retrieval
+- **Retrieval strategy**: Uses semantic, keyword, or hybrid search
+- **Result refinement**: Re-ranks results for optimal relevance
+- **Answer generation**: Synthesizes answers from retrieved context
+
+## Quick Start
+
+```python
+import os
+from mini import AgenticRAG, EmbeddingModel, VectorStore
+
+# Initialize components
+embedding_model = EmbeddingModel()
+vector_store = VectorStore(
+    uri=os.getenv("MILVUS_URI"),
+    token=os.getenv("MILVUS_TOKEN"),
+    collection_name="my_docs",
+    dimension=1536
+)
+
+# Create RAG system
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model
+)
+
+# Index documents
+rag.index_document("document.pdf")
+
+# Query
+response = rag.query("What is the main topic?")
+print(response.answer)
+```
+
+## Configuration
+
+AgenticRAG uses a configuration-based API for clean, organized settings:
+
+### Minimal Configuration
+
+```python
+# Uses defaults for everything
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model
+)
+```
+
+### LLM Configuration
+
+```python
+from mini import AgenticRAG, LLMConfig
+
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    llm_config=LLMConfig(
+        model="gpt-4o-mini",        # Model name
+        api_key=None,               # Uses OPENAI_API_KEY env var
+        base_url=None,              # Uses OPENAI_BASE_URL env var
+        temperature=0.7,            # Response creativity
+        timeout=60.0,               # Request timeout
+        max_retries=3               # Retry failed requests
+    )
+)
+```
+
+### Retrieval Configuration
+
+```python
+from mini import RetrievalConfig
+
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    retrieval_config=RetrievalConfig(
+        top_k=10,                   # Initial retrieval count
+        rerank_top_k=3,             # Top chunks after reranking
+        use_query_rewriting=True,   # Enable query variations
+        use_reranking=True,         # Enable result reranking
+        use_hybrid_search=False,    # Use semantic + BM25
+        rrf_k=60                    # RRF constant for hybrid search
+    )
+)
+```
+
+### Complete Configuration
+
+```python
+from mini import (
+    AgenticRAG,
+    LLMConfig,
+    RetrievalConfig,
+    RerankerConfig,
+    ObservabilityConfig
+)
+
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    # LLM settings
+    llm_config=LLMConfig(
+        model="gpt-4o-mini",
+        temperature=0.7
+    ),
+    # Retrieval settings
+    retrieval_config=RetrievalConfig(
+        top_k=10,
+        rerank_top_k=5,
+        use_query_rewriting=True,
+        use_reranking=True,
+        use_hybrid_search=True
+    ),
+    # Reranker settings
+    reranker_config=RerankerConfig(
+        type="llm"  # "llm", "cohere", "sentence-transformer"
+    ),
+    # Observability
+    observability_config=ObservabilityConfig(
+        enabled=True
+    )
+)
+```
+
+## The Agentic Pipeline
+
+When you query the system, AgenticRAG executes an intelligent pipeline:
+
+<Steps>
+  <Step title="Query Rewriting (Optional)">
+    Generates multiple query variations to improve retrieval coverage
+    
+    ```
+    Original: "What is the budget?"
+    Variations:
+    - "How much funding was allocated?"
+    - "Budget allocation details"
+    - "Financial resources assigned"
+    ```
+  </Step>
+  
+  <Step title="Embedding">
+    Converts query (and variations) into vector embeddings
+  </Step>
+  
+  <Step title="Retrieval">
+    Searches vector store using:
+    - Semantic search (default)
+    - Hybrid search (semantic + BM25)
+    
+    Retrieves `top_k` most relevant chunks
+  </Step>
+  
+  <Step title="Re-ranking (Optional)">
+    Re-ranks retrieved chunks using:
+    - LLM-based scoring
+    - Cohere Rerank API
+    - Local cross-encoder models
+    
+    Keeps top `rerank_top_k` chunks
+  </Step>
+  
+  <Step title="Answer Generation">
+    Uses LLM to generate answer based on re-ranked context
+  </Step>
+</Steps>
+
+## Operations
+
+### Index Documents
+
+```python
+# Index a single document
+num_chunks = rag.index_document(
+    document_path="document.pdf",
+    metadata={"category": "research", "year": 2024}
+)
+print(f"Indexed {num_chunks} chunks")
+
+# Index multiple documents
+total_chunks = rag.index_documents([
+    "doc1.pdf",
+    "doc2.docx",
+    "doc3.txt"
+])
+print(f"Indexed {total_chunks} total chunks")
+```
+
+### Query the System
+
+```python
+# Basic query
+response = rag.query("What are the key findings?")
+print(response.answer)
+
+# Query with custom parameters
+response = rag.query(
+    query="What are the key findings?",
+    top_k=15,              # Override default
+    rerank_top_k=5,        # Override default
+    return_sources=True    # Include source chunks
+)
+```
+
+### Access Response Details
+
+```python
+response = rag.query("What is the budget?")
+
+# Answer
+print(f"Answer: {response.answer}")
+
+# Query information
+print(f"Original query: {response.original_query}")
+print(f"Query variations: {response.rewritten_queries}")
+
+# Retrieved chunks
+print(f"Number of chunks: {len(response.retrieved_chunks)}")
+for chunk in response.retrieved_chunks:
+    print(f"  Score: {chunk.reranked_score:.4f}")
+    print(f"  Text: {chunk.text[:150]}...")
+    print(f"  Metadata: {chunk.metadata}")
+
+# Metadata
+print(f"Metadata: {response.metadata}")
+```
+
+### Get System Statistics
+
+```python
+stats = rag.get_stats()
+print(f"Total documents: {stats['total_documents']}")
+print(f"Collection name: {stats['collection_name']}")
+```
+
+## Features
+
+### Query Rewriting
+
+Automatically generates query variations for better retrieval:
+
+```python
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    retrieval_config=RetrievalConfig(
+        use_query_rewriting=True  # Enable query rewriting
+    )
+)
+
+response = rag.query("What is the budget?")
+print(f"Original: {response.original_query}")
+print(f"Variations: {response.rewritten_queries}")
+```
+
+<Card title="Learn more" icon="lightbulb" href="/features/query-rewriting">
+  Explore query rewriting in detail
+</Card>
+
+### Hybrid Search
+
+Combine semantic and keyword search:
+
+```python
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    retrieval_config=RetrievalConfig(
+        use_hybrid_search=True  # Enable hybrid search
+    )
+)
+
+response = rag.query("budget allocation railways")
+```
+
+<Card title="Learn more" icon="magnifying-glass" href="/features/hybrid-search">
+  Discover hybrid search capabilities
+</Card>
+
+### Re-ranking
+
+Improve result quality with re-ranking:
+
+```python
+from mini import RerankerConfig
+
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    retrieval_config=RetrievalConfig(
+        use_reranking=True,
+        rerank_top_k=3
+    ),
+    reranker_config=RerankerConfig(
+        type="cohere"  # or "llm", "sentence-transformer"
+    )
+)
+```
+
+<Card title="Learn more" icon="ranking-star" href="/features/reranking">
+  Explore re-ranking strategies
+</Card>
+
+### Observability
+
+Track and monitor your RAG pipeline:
+
+```python
+from mini import ObservabilityConfig
+
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    observability_config=ObservabilityConfig(
+        enabled=True
+    )
+)
+
+# All operations are now traced in Langfuse
+```
+
+<Card title="Learn more" icon="chart-line" href="/features/observability">
+  Set up observability and monitoring
+</Card>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Configuration Management">
+    **Organize configurations logically:**
+    
+    ```python
+    # Good: Clear, organized configuration
+    rag = AgenticRAG(
+        vector_store=vector_store,
+        embedding_model=embedding_model,
+        llm_config=LLMConfig(model="gpt-4o-mini"),
+        retrieval_config=RetrievalConfig(
+            top_k=10,
+            use_query_rewriting=True
+        )
+    )
+    
+    # Bad: Mixing concerns
+    # Don't put retrieval settings in LLM config
+    ```
+  </Accordion>
+
+  <Accordion title="Start Simple">
+    **Begin with defaults, then optimize:**
+    
+    ```python
+    # Phase 1: Start simple
+    rag = AgenticRAG(
+        vector_store=vector_store,
+        embedding_model=embedding_model
+    )
+    
+    # Phase 2: Add features based on results
+    rag = AgenticRAG(
+        vector_store=vector_store,
+        embedding_model=embedding_model,
+        retrieval_config=RetrievalConfig(
+            use_hybrid_search=True  # Add if needed
+        )
+    )
+    ```
+  </Accordion>
+
+  <Accordion title="Monitor Performance">
+    **Use observability to understand behavior:**
+    
+    ```python
+    rag = AgenticRAG(
+        vector_store=vector_store,
+        embedding_model=embedding_model,
+        observability_config=ObservabilityConfig(enabled=True)
+    )
+    
+    # Check Langfuse dashboard for:
+    # - Query patterns
+    # - Retrieval quality
+    # - LLM performance
+    # - Cost tracking
+    ```
+  </Accordion>
+
+  <Accordion title="Metadata Strategy">
+    **Use metadata for filtering and organization:**
+    
+    ```python
+    # Index with rich metadata
+    rag.index_document(
+        "document.pdf",
+        metadata={
+            "source": "document.pdf",
+            "category": "research",
+            "author": "John Doe",
+            "date": "2024-01-15",
+            "tags": ["ai", "ml"]
+        }
+    )
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Common Patterns
+
+### Pattern 1: Document Q&A System
+
+```python
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    llm_config=LLMConfig(model="gpt-4o-mini")
+)
+
+# Index knowledge base
+rag.index_documents(["faq.pdf", "manual.pdf", "guide.pdf"])
+
+# Interactive Q&A
+while True:
+    question = input("Ask a question: ")
+    response = rag.query(question)
+    print(f"\n{response.answer}\n")
+```
+
+### Pattern 2: Research Assistant
+
+```python
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    retrieval_config=RetrievalConfig(
+        top_k=15,              # More context
+        rerank_top_k=5,
+        use_query_rewriting=True
+    )
+)
+
+# Index research papers
+rag.index_documents(["paper1.pdf", "paper2.pdf", "paper3.pdf"])
+
+# Analyze
+queries = [
+    "What are the main findings?",
+    "What methodologies were used?",
+    "What are the limitations?"
+]
+
+for query in queries:
+    response = rag.query(query)
+    print(f"\n{query}\n{response.answer}\n")
+```
+
+### Pattern 3: Multi-lingual Support
+
+```python
+# Use appropriate embedding model
+embedding_model = EmbeddingModel(
+    model="text-embedding-3-large"  # Better multilingual support
+)
+
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    llm_config=LLMConfig(model="gpt-4o-mini")
+)
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Poor answer quality">
+    **Solutions:**
+    
+    1. Enable query rewriting
+    2. Increase `top_k` for more context
+    3. Enable re-ranking
+    4. Try hybrid search
+    
+    ```python
+    rag = AgenticRAG(
+        vector_store=vector_store,
+        embedding_model=embedding_model,
+        retrieval_config=RetrievalConfig(
+            top_k=15,
+            rerank_top_k=5,
+            use_query_rewriting=True,
+            use_reranking=True,
+            use_hybrid_search=True
+        )
+    )
+    ```
+  </Accordion>
+
+  <Accordion title="Slow queries">
+    **Solutions:**
+    
+    1. Reduce `top_k`
+    2. Disable query rewriting
+    3. Use faster embedding model
+    4. Optimize vector store index
+    
+    ```python
+    rag = AgenticRAG(
+        vector_store=vector_store,
+        embedding_model=embedding_model,
+        retrieval_config=RetrievalConfig(
+            top_k=5,
+            use_query_rewriting=False
+        )
+    )
+    ```
+  </Accordion>
+
+  <Accordion title="High costs">
+    **Solutions:**
+    
+    1. Use smaller LLM model
+    2. Reduce `top_k` and `rerank_top_k`
+    3. Disable query rewriting
+    4. Cache results
+    
+    ```python
+    rag = AgenticRAG(
+        vector_store=vector_store,
+        embedding_model=embedding_model,
+        llm_config=LLMConfig(model="gpt-4o-mini"),  # Cheaper model
+        retrieval_config=RetrievalConfig(
+            top_k=5,
+            rerank_top_k=3
+        )
+    )
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Query Rewriting" icon="pen" href="/features/query-rewriting">
+    Learn about automatic query optimization
+  </Card>
+  <Card title="Re-ranking" icon="ranking-star" href="/features/reranking">
+    Explore re-ranking strategies
+  </Card>
+  <Card title="Hybrid Search" icon="magnifying-glass" href="/features/hybrid-search">
+    Combine semantic and keyword search
+  </Card>
+  <Card title="Examples" icon="lightbulb" href="/examples/document-qa">
+    See practical applications
+  </Card>
+</CardGroup>
+

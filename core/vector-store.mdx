@@ -1,0 +1,524 @@
+---
+title: "Vector Store"
+description: "Store and search embeddings with Milvus"
+---
+
+## Overview
+
+The `VectorStore` class manages your vector database using **Milvus**, a high-performance vector database designed for similarity search. It handles:
+
+- **Storage**: Efficiently store embeddings with metadata
+- **Search**: Fast similarity search using vector indexes
+- **Hybrid Search**: Combine semantic and keyword (BM25) search
+- **Management**: Create, update, and delete collections
+
+## Basic Usage
+
+```python
+import os
+from mini.store import VectorStore
+
+# Initialize vector store
+vector_store = VectorStore(
+    uri=os.getenv("MILVUS_URI"),
+    token=os.getenv("MILVUS_TOKEN"),
+    collection_name="my_documents",
+    dimension=1536  # Must match embedding dimension
+)
+
+# Insert embeddings
+ids = vector_store.insert(
+    embeddings=embeddings,
+    texts=["First chunk", "Second chunk"],
+    metadata=[
+        {"source": "doc1.pdf", "page": 1},
+        {"source": "doc1.pdf", "page": 2}
+    ]
+)
+
+# Search for similar vectors
+query_embedding = embedding_model.embed_query("What is this about?")
+results = vector_store.search(
+    query_embedding=query_embedding,
+    top_k=5
+)
+
+# Get collection statistics
+count = vector_store.count()
+print(f"Total documents: {count}")
+```
+
+## Configuration
+
+### Basic Configuration
+
+```python
+vector_store = VectorStore(
+    uri="https://your-milvus-instance.com",
+    token="your-token",
+    collection_name="documents",
+    dimension=1536
+)
+```
+
+### Advanced Configuration
+
+```python
+from mini.store import MilvusConfig, VectorStore
+
+config = MilvusConfig(
+    uri="https://your-instance.com",
+    token="your-token",
+    collection_name="documents",
+    dimension=1536,
+    metric_type="IP",        # IP (cosine), L2, or COSINE
+    index_type="IVF_FLAT",   # IVF_FLAT, IVF_SQ8, HNSW
+    nlist=128                # Number of cluster units
+)
+
+vector_store = VectorStore(config=config)
+```
+
+## Similarity Metrics
+
+Choose the right metric for your use case:
+
+| Metric | Description | Best For |
+|--------|-------------|----------|
+| **IP** (Inner Product) | Cosine similarity (default) | Most use cases, normalized embeddings |
+| **L2** | Euclidean distance | Absolute distance matters |
+| **COSINE** | Cosine similarity (explicit) | When using non-normalized vectors |
+
+```python
+# Using cosine similarity (recommended)
+vector_store = VectorStore(
+    uri=os.getenv("MILVUS_URI"),
+    token=os.getenv("MILVUS_TOKEN"),
+    collection_name="docs",
+    dimension=1536,
+    metric_type="IP"  # Inner Product = Cosine for normalized vectors
+)
+```
+
+## Index Types
+
+Different index types offer tradeoffs between speed and accuracy:
+
+<AccordionGroup>
+  <Accordion title="IVF_FLAT (Recommended)">
+    **Best balance for most use cases**
+    
+    - Good search performance
+    - High accuracy
+    - Moderate memory usage
+    
+    ```python
+    vector_store = VectorStore(
+        uri=os.getenv("MILVUS_URI"),
+        token=os.getenv("MILVUS_TOKEN"),
+        collection_name="docs",
+        dimension=1536,
+        index_type="IVF_FLAT",
+        nlist=128  # Number of clusters
+    )
+    ```
+  </Accordion>
+
+  <Accordion title="HNSW">
+    **Highest performance for large datasets**
+    
+    - Fastest search speed
+    - High accuracy
+    - Higher memory usage
+    
+    ```python
+    vector_store = VectorStore(
+        uri=os.getenv("MILVUS_URI"),
+        token=os.getenv("MILVUS_TOKEN"),
+        collection_name="docs",
+        dimension=1536,
+        index_type="HNSW"
+    )
+    ```
+  </Accordion>
+
+  <Accordion title="IVF_SQ8">
+    **Memory-optimized**
+    
+    - Lower memory footprint
+    - Good performance
+    - Slightly lower accuracy
+    
+    ```python
+    vector_store = VectorStore(
+        uri=os.getenv("MILVUS_URI"),
+        token=os.getenv("MILVUS_TOKEN"),
+        collection_name="docs",
+        dimension=1536,
+        index_type="IVF_SQ8"
+    )
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Operations
+
+### Insert Embeddings
+
+```python
+# Insert with metadata
+ids = vector_store.insert(
+    embeddings=[[0.1, 0.2, ...], [0.3, 0.4, ...]],
+    texts=["First document", "Second document"],
+    metadata=[
+        {"source": "doc1.pdf", "page": 1, "category": "research"},
+        {"source": "doc2.pdf", "page": 1, "category": "tutorial"}
+    ]
+)
+
+print(f"Inserted {len(ids)} vectors")
+```
+
+### Semantic Search
+
+```python
+# Basic search
+results = vector_store.search(
+    query_embedding=query_embedding,
+    top_k=5
+)
+
+for result in results:
+    print(f"Score: {result['score']}")
+    print(f"Text: {result['text']}")
+    print(f"Metadata: {result['metadata']}")
+```
+
+### Search with Filters
+
+```python
+# Filter by metadata
+results = vector_store.search(
+    query_embedding=query_embedding,
+    top_k=5,
+    filter_expr='metadata["category"] == "research"'
+)
+
+# Complex filters
+results = vector_store.search(
+    query_embedding=query_embedding,
+    top_k=5,
+    filter_expr='metadata["year"] >= 2023 and metadata["category"] == "research"'
+)
+```
+
+### Hybrid Search
+
+Combine semantic (vector) and keyword (BM25) search:
+
+```python
+# Enable hybrid search when creating vector store
+vector_store = VectorStore(
+    uri=os.getenv("MILVUS_URI"),
+    token=os.getenv("MILVUS_TOKEN"),
+    collection_name="docs",
+    dimension=1536,
+    enable_hybrid_search=True  # Enable BM25 + semantic
+)
+
+# Search with hybrid mode
+results = vector_store.hybrid_search(
+    query="budget allocation for railways",
+    query_embedding=query_embedding,
+    top_k=10
+)
+```
+
+<Card title="Learn more about Hybrid Search" icon="magnifying-glass" href="/features/hybrid-search">
+  Discover how to combine semantic and keyword search for better results
+</Card>
+
+### Delete Vectors
+
+```python
+# Delete by filter expression
+num_deleted = vector_store.delete(
+    expr='metadata["year"] < 2020'
+)
+print(f"Deleted {num_deleted} vectors")
+```
+
+### Get Collection Info
+
+```python
+# Get total count
+count = vector_store.count()
+print(f"Total vectors: {count}")
+
+# Get collection statistics
+stats = vector_store.get_collection_stats()
+print(stats)
+```
+
+### Drop Collection
+
+<Warning>
+  This permanently deletes all data in the collection. Use with caution!
+</Warning>
+
+```python
+# Drop entire collection
+vector_store.drop_collection()
+```
+
+## Integration with AgenticRAG
+
+When using `AgenticRAG`, vector storage is handled automatically:
+
+```python
+from mini import AgenticRAG, EmbeddingModel, VectorStore
+
+# Setup vector store
+vector_store = VectorStore(
+    uri=os.getenv("MILVUS_URI"),
+    token=os.getenv("MILVUS_TOKEN"),
+    collection_name="docs",
+    dimension=1536
+)
+
+# Use with RAG
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model
+)
+
+# Storage is handled automatically
+rag.index_document("document.pdf")
+response = rag.query("What is this about?")
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Collection Naming">
+    **Use descriptive, consistent names:**
+    
+    - `company_docs_v1` - Good
+    - `my_collection` - Less descriptive
+    - Use versioning for schema changes
+    
+    ```python
+    vector_store = VectorStore(
+        uri=os.getenv("MILVUS_URI"),
+        token=os.getenv("MILVUS_TOKEN"),
+        collection_name="company_docs_v1",
+        dimension=1536
+    )
+    ```
+  </Accordion>
+
+  <Accordion title="Metadata Design">
+    **Store useful metadata for filtering:**
+    
+    ```python
+    metadata = {
+        "source": "document.pdf",      # Document source
+        "page": 5,                      # Page number
+        "category": "research",         # Category
+        "author": "John Doe",          # Author
+        "date": "2024-01-15",          # Date
+        "tags": ["ai", "ml", "rag"]    # Tags
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Batch Operations">
+    **Insert in batches for better performance:**
+    
+    ```python
+    # Good: Batch insert
+    vector_store.insert(
+        embeddings=all_embeddings,
+        texts=all_texts,
+        metadata=all_metadata
+    )
+    
+    # Bad: Individual inserts
+    # for emb, text, meta in zip(embeddings, texts, metadata):
+    #     vector_store.insert([emb], [text], [meta])
+    ```
+  </Accordion>
+
+  <Accordion title="Connection Management">
+    **Disconnect when done:**
+    
+    ```python
+    try:
+        # Use vector store
+        results = vector_store.search(...)
+    finally:
+        # Clean up connection
+        vector_store.disconnect()
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Advanced Usage
+
+### Custom Output Fields
+
+```python
+# Specify which fields to return
+results = vector_store.search(
+    query_embedding=query_embedding,
+    top_k=5,
+    output_fields=["text", "metadata"]
+)
+```
+
+### Multiple Collections
+
+```python
+# Use different collections for different purposes
+docs_store = VectorStore(
+    uri=os.getenv("MILVUS_URI"),
+    token=os.getenv("MILVUS_TOKEN"),
+    collection_name="documents",
+    dimension=1536
+)
+
+code_store = VectorStore(
+    uri=os.getenv("MILVUS_URI"),
+    token=os.getenv("MILVUS_TOKEN"),
+    collection_name="code_snippets",
+    dimension=1536
+)
+```
+
+### Upsert Operations
+
+```python
+# Update or insert
+# First delete existing
+vector_store.delete(expr='metadata["doc_id"] == "doc123"')
+
+# Then insert new version
+vector_store.insert(
+    embeddings=new_embeddings,
+    texts=new_texts,
+    metadata=[{"doc_id": "doc123", ...}]
+)
+```
+
+## Performance Tuning
+
+<CardGroup cols={2}>
+  <Card title="Index Selection" icon="chart-line">
+    Choose index type based on dataset size and requirements
+  </Card>
+  <Card title="Batch Size" icon="layer-group">
+    Insert 100-1000 vectors per batch for optimal performance
+  </Card>
+  <Card title="Memory Management" icon="memory">
+    Monitor memory usage, especially with HNSW index
+  </Card>
+  <Card title="Query Optimization" icon="gauge">
+    Use filters to reduce search space
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Connection errors">
+    **Solution:** Check Milvus connection:
+    
+    ```python
+    # Verify connection
+    try:
+        count = vector_store.count()
+        print(f"Connected! Vector count: {count}")
+    except Exception as e:
+        print(f"Connection error: {e}")
+    ```
+  </Accordion>
+
+  <Accordion title="Dimension mismatch">
+    **Solution:** Ensure vector store dimension matches embeddings:
+    
+    ```python
+    # Check embedding dimension
+    test_embedding = embedding_model.embed_query("test")
+    print(f"Embedding dim: {len(test_embedding)}")
+    
+    # Create matching vector store
+    vector_store = VectorStore(
+        uri=os.getenv("MILVUS_URI"),
+        token=os.getenv("MILVUS_TOKEN"),
+        collection_name="docs",
+        dimension=len(test_embedding)
+    )
+    ```
+  </Accordion>
+
+  <Accordion title="Slow search performance">
+    **Solution:** Optimize index and search parameters:
+    
+    ```python
+    # Use HNSW for faster search
+    vector_store = VectorStore(
+        uri=os.getenv("MILVUS_URI"),
+        token=os.getenv("MILVUS_TOKEN"),
+        collection_name="docs",
+        dimension=1536,
+        index_type="HNSW"
+    )
+    ```
+  </Accordion>
+
+  <Accordion title="Collection already exists">
+    **Solution:** Use a different name or drop existing:
+    
+    ```python
+    # Use versioned names
+    vector_store = VectorStore(
+        uri=os.getenv("MILVUS_URI"),
+        token=os.getenv("MILVUS_TOKEN"),
+        collection_name="docs_v2",  # New version
+        dimension=1536
+    )
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Milvus Deployment Options
+
+<CardGroup cols={3}>
+  <Card title="Zilliz Cloud" icon="cloud" href="https://cloud.zilliz.com">
+    Managed Milvus with free tier
+  </Card>
+  <Card title="Docker" icon="docker" href="https://milvus.io/docs/install_standalone-docker.md">
+    Run Milvus locally
+  </Card>
+  <Card title="Kubernetes" icon="dharmachakra" href="https://milvus.io/docs/install_cluster-milvusoperator.md">
+    Production deployments
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Hybrid Search" icon="magnifying-glass" href="/features/hybrid-search">
+    Combine semantic and keyword search
+  </Card>
+  <Card title="AgenticRAG" icon="robot" href="/features/agentic-rag">
+    Use the complete RAG pipeline
+  </Card>
+  <Card title="Configuration" icon="gear" href="/guides/configuration">
+    Advanced configuration options
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference/vector-store">
+    Complete API documentation
+  </Card>
+</CardGroup>
+

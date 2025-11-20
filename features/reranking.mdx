@@ -1,0 +1,477 @@
+---
+title: "Re-ranking"
+description: "Improve retrieval quality with multiple re-ranking strategies"
+---
+
+## Overview
+
+Re-ranking is the process of re-scoring and re-ordering retrieved chunks to improve relevance. After initial retrieval (which may return 10-20 chunks), re-ranking selects the most relevant 3-5 chunks for answer generation.
+
+**Why re-rank?**
+- Embedding-based retrieval is fast but may miss nuances
+- Re-rankers use more sophisticated models to assess relevance
+- Better chunks = better answers from the LLM
+
+## Re-ranking Strategies
+
+Mini RAG supports multiple re-ranking methods:
+
+<CardGroup cols={3}>
+  <Card title="LLM-based" icon="brain">
+    Uses your LLM to score relevance (default)
+  </Card>
+  <Card title="Cohere API" icon="cloud">
+    Specialized re-ranking models via Cohere
+  </Card>
+  <Card title="Local Models" icon="server">
+    Open-source cross-encoders running locally
+  </Card>
+</CardGroup>
+
+## Quick Start
+
+```python
+from mini import AgenticRAG, RetrievalConfig, RerankerConfig
+
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    retrieval_config=RetrievalConfig(
+        top_k=10,           # Retrieve 10 chunks
+        rerank_top_k=3,     # Keep top 3 after reranking
+        use_reranking=True  # Enable reranking
+    ),
+    reranker_config=RerankerConfig(
+        type="llm"  # Default: LLM-based reranking
+    )
+)
+
+response = rag.query("What are the key findings?")
+```
+
+## Strategy 1: LLM-Based Re-ranking
+
+Uses your configured LLM to score chunk relevance.
+
+### Configuration
+
+```python
+from mini import RerankerConfig
+
+reranker_config = RerankerConfig(
+    type="llm"  # Use LLM for reranking
+)
+
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    reranker_config=reranker_config
+)
+```
+
+### Pros & Cons
+
+<CardGroup cols={2}>
+  <Card title="Pros" icon="check">
+    - No additional API needed
+    - Uses existing LLM
+    - Good quality
+    - Simple setup
+  </Card>
+  <Card title="Cons" icon="x">
+    - Slower than dedicated rerankers
+    - More expensive per query
+    - Limited by LLM context
+  </Card>
+</CardGroup>
+
+## Strategy 2: Cohere Re-rank API
+
+Uses Cohere's specialized re-ranking models.
+
+### Configuration
+
+```python
+import os
+from mini import RerankerConfig
+
+reranker_config = RerankerConfig(
+    type="cohere",
+    kwargs={
+        "api_key": os.getenv("COHERE_API_KEY"),
+        "model": "rerank-english-v3.0"  # or "rerank-multilingual-v3.0"
+    }
+)
+
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    reranker_config=reranker_config
+)
+```
+
+### Available Models
+
+| Model | Languages | Best For |
+|-------|-----------|----------|
+| `rerank-english-v3.0` | English | English content (best quality) |
+| `rerank-multilingual-v3.0` | 100+ languages | International content |
+
+### Setup
+
+<Steps>
+  <Step title="Get API Key">
+    Sign up at [cohere.com](https://cohere.com) and get your API key
+  </Step>
+  <Step title="Add to Environment">
+    Add `COHERE_API_KEY` to your `.env` file
+  </Step>
+  <Step title="Configure">
+    Use `type="cohere"` in `RerankerConfig`
+  </Step>
+</Steps>
+
+### Pros & Cons
+
+<CardGroup cols={2}>
+  <Card title="Pros" icon="check">
+    - Very fast
+    - High quality
+    - Specialized for reranking
+    - Cost-effective
+  </Card>
+  <Card title="Cons" icon="x">
+    - Requires API key
+    - External dependency
+    - API limits apply
+  </Card>
+</CardGroup>
+
+## Strategy 3: Local Cross-Encoders
+
+Uses open-source sentence-transformer models locally.
+
+### Configuration
+
+```python
+from mini import RerankerConfig
+
+reranker_config = RerankerConfig(
+    type="sentence-transformer",
+    kwargs={
+        "model_name": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+        "device": "cuda"  # or "cpu"
+    }
+)
+
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    reranker_config=reranker_config
+)
+```
+
+### Available Models
+
+| Model | Size | Quality | Speed |
+|-------|------|---------|-------|
+| `cross-encoder/ms-marco-TinyBERT-L-2-v2` | Tiny | Good | Fast |
+| `cross-encoder/ms-marco-MiniLM-L-6-v2` | Small | Better | Medium |
+| `cross-encoder/ms-marco-MiniLM-L-12-v2` | Medium | Best | Slower |
+
+### Pros & Cons
+
+<CardGroup cols={2}>
+  <Card title="Pros" icon="check">
+    - No API costs
+    - Data privacy (runs locally)
+    - No rate limits
+    - Open source
+  </Card>
+  <Card title="Cons" icon="x">
+    - Requires local compute
+    - GPU recommended
+    - Model download needed
+    - Slower than Cohere
+  </Card>
+</CardGroup>
+
+## Strategy 4: Custom Re-ranker
+
+Provide your own re-ranker instance:
+
+```python
+from mini.reranker import CohereReranker
+from mini import RerankerConfig
+
+# Create custom reranker with specific settings
+custom_reranker = CohereReranker(
+    api_key=os.getenv("COHERE_API_KEY"),
+    model="rerank-multilingual-v3.0",
+    max_chunks_per_doc=10
+)
+
+# Use custom instance
+reranker_config = RerankerConfig(
+    custom_reranker=custom_reranker
+)
+
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    reranker_config=reranker_config
+)
+```
+
+## Disabling Re-ranking
+
+```python
+from mini import RetrievalConfig
+
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    retrieval_config=RetrievalConfig(
+        use_reranking=False  # Disable reranking
+    )
+)
+```
+
+## Comparison
+
+### Performance
+
+```python
+# Test different rerankers
+rerankers = [
+    ("LLM", "llm", {}),
+    ("Cohere", "cohere", {"model": "rerank-english-v3.0"}),
+    ("Local", "sentence-transformer", {"model_name": "cross-encoder/ms-marco-MiniLM-L-6-v2"})
+]
+
+query = "What are the key findings?"
+
+for name, type, kwargs in rerankers:
+    rag = AgenticRAG(
+        vector_store=vector_store,
+        embedding_model=embedding_model,
+        reranker_config=RerankerConfig(type=type, kwargs=kwargs)
+    )
+    
+    response = rag.query(query)
+    print(f"{name}: {response.answer[:150]}...")
+```
+
+### Speed Comparison
+
+| Method | Speed | Cost | Quality |
+|--------|-------|------|---------|
+| No reranking | Fastest | Free | Baseline |
+| Cohere | Fast | Low ($0.002/1K docs) | Excellent |
+| Local Cross-Encoder | Medium | Free | Very Good |
+| LLM-based | Slow | Medium | Good |
+
+### Quality Comparison
+
+```
+Query: "What is the budget for railways?"
+
+No reranking: 
+├─ Chunk 1: [0.85] Railways infrastructure...
+├─ Chunk 2: [0.84] Budget allocation total...
+└─ Chunk 3: [0.82] Transportation spending...
+
+With Cohere reranking:
+├─ Chunk 1: [0.95] Railways budget: $50M allocated...
+├─ Chunk 2: [0.89] Infrastructure railways improvements...
+└─ Chunk 3: [0.75] Transportation budget overview...
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Choose the Right Strategy">
+    **Selection guide:**
+    
+    - **Cohere**: Best balance for production (fast + high quality)
+    - **LLM**: Simple setup, good for prototyping
+    - **Local**: Data privacy requirements, no API costs
+    - **None**: Speed is critical, budget is tight
+  </Accordion>
+
+  <Accordion title="Top-K Configuration">
+    **Balance retrieval and reranking:**
+    
+    ```python
+    retrieval_config = RetrievalConfig(
+        top_k=15,        # Cast a wide net
+        rerank_top_k=5   # Keep best 5
+    )
+    ```
+    
+    - Higher `top_k`: More candidates, better recall
+    - Lower `rerank_top_k`: Only best chunks for LLM
+  </Accordion>
+
+  <Accordion title="Combine with Hybrid Search">
+    **Optimal pipeline:**
+    
+    ```python
+    retrieval_config = RetrievalConfig(
+        top_k=20,
+        rerank_top_k=5,
+        use_hybrid_search=True,  # Semantic + BM25
+        use_reranking=True        # Then rerank
+    )
+    ```
+    
+    1. Hybrid search retrieves 20 diverse chunks
+    2. Re-ranker selects top 5 most relevant
+    3. LLM generates answer from top 5
+  </Accordion>
+
+  <Accordion title="Monitor Performance">
+    **Use observability to track:**
+    
+    - Reranking latency
+    - Score distributions
+    - Cost per query
+    - Quality improvements
+    
+    ```python
+    observability_config = ObservabilityConfig(enabled=True)
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Cost Analysis
+
+### Cohere Rerank Pricing
+
+```
+$0.002 per 1,000 documents
+
+Example costs:
+- 100 queries × 10 chunks = 1,000 docs = $0.002
+- 1,000 queries × 10 chunks = 10,000 docs = $0.02
+- 10,000 queries × 10 chunks = 100,000 docs = $0.20
+```
+
+### LLM-based Cost
+
+```
+Depends on your LLM pricing
+
+With GPT-4o-mini:
+- 10 chunks × 200 tokens each = 2,000 tokens input
+- $0.15 per 1M input tokens
+- Cost per query: ~$0.0003
+
+100,000 queries = ~$30
+```
+
+### Local Cross-Encoder
+
+```
+Zero API costs
+
+One-time costs:
+- GPU (optional): $500-2000
+- Compute time: Minimal
+
+Ongoing costs:
+- Electricity: ~$0.10/day with GPU
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Cohere API errors">
+    **Solution:** Check your API key:
+    
+    ```bash
+    echo $COHERE_API_KEY
+    ```
+    
+    Ensure it's set in your `.env` file and valid.
+  </Accordion>
+
+  <Accordion title="Local model not loading">
+    **Solution:** Install sentence-transformers:
+    
+    ```bash
+    pip install sentence-transformers
+    ```
+    
+    First run downloads the model (~100MB).
+  </Accordion>
+
+  <Accordion title="Slow reranking">
+    **Solutions:**
+    
+    1. Switch to Cohere (fastest)
+    2. Reduce `top_k` (fewer chunks to rerank)
+    3. Use smaller local model
+    4. Disable reranking if speed is critical
+  </Accordion>
+
+  <Accordion title="Poor reranking quality">
+    **Solutions:**
+    
+    1. Try Cohere (usually best quality)
+    2. Increase `top_k` (more candidates)
+    3. Ensure good initial retrieval
+    4. Check if chunks are well-formed
+  </Accordion>
+</AccordionGroup>
+
+## Advanced Usage
+
+### Dynamic Reranker Selection
+
+```python
+def get_reranker_config(query_type):
+    if query_type == "technical":
+        return RerankerConfig(type="cohere")
+    elif query_type == "simple":
+        return RerankerConfig(type="llm")
+    else:
+        return RerankerConfig(type="sentence-transformer")
+
+# Use different rerankers based on query
+config = get_reranker_config("technical")
+rag = AgenticRAG(
+    vector_store=vector_store,
+    embedding_model=embedding_model,
+    reranker_config=config
+)
+```
+
+### Accessing Reranked Scores
+
+```python
+response = rag.query("What are the findings?")
+
+for chunk in response.retrieved_chunks:
+    print(f"Original score: {chunk.score:.4f}")
+    print(f"Reranked score: {chunk.reranked_score:.4f}")
+    print(f"Improvement: {chunk.reranked_score - chunk.score:.4f}")
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Hybrid Search" icon="magnifying-glass" href="/features/hybrid-search">
+    Combine reranking with hybrid search
+  </Card>
+  <Card title="Query Rewriting" icon="pen" href="/features/query-rewriting">
+    Improve retrieval with query variations
+  </Card>
+  <Card title="AgenticRAG" icon="robot" href="/features/agentic-rag">
+    Complete RAG pipeline documentation
+  </Card>
+  <Card title="Examples" icon="lightbulb" href="/examples/document-qa">
+    See reranking in action
+  </Card>
+</CardGroup>
+

@@ -1,97 +1,190 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "Mini RAG"
+description: "A lightweight, modular, and production-ready RAG library built with Python"
 ---
 
-## Setting up
+<img
+  src="/images/hero-light.png"
+  alt="Mini RAG Hero"
+  className="block dark:hidden"
+/>
+<img
+  src="/images/hero-dark.png"
+  alt="Mini RAG Hero"
+  className="hidden dark:block"
+/>
 
-Get your documentation site up and running in minutes.
+## Welcome to Mini RAG 🚀
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
+Mini RAG is a lightweight, modular, and production-ready Retrieval-Augmented Generation (RAG) library built with Python. Install with `uv add mini-rag` and start building intelligent document search and question-answering systems in minutes.
 
-## Make it yours
+### Key Features
 
-Design a docs site that looks great and empowers your users.
+<CardGroup cols={2}>
+  <Card title="🤖 Agentic RAG" icon="robot">
+    Intelligent query processing with automatic query rewriting and result re-ranking
+  </Card>
+  <Card title="📄 Multi-format Support" icon="file">
+    Load documents from PDF, DOCX, images, and more using MarkItDown
+  </Card>
+  <Card title="✂️ Smart Chunking" icon="scissors">
+    Advanced text chunking with Chonkie for optimal context preservation
+  </Card>
+  <Card title="🔮 Flexible Embeddings" icon="wand-magic-sparkles">
+    Support for OpenAI, Azure OpenAI, and any OpenAI-compatible API
+  </Card>
+  <Card title="💾 Vector Storage" icon="database">
+    Powered by Milvus for high-performance similarity search
+  </Card>
+  <Card title="🎯 Query Optimization" icon="bullseye">
+    Automatic query rewriting for better retrieval results
+  </Card>
+  <Card title="🔍 Hybrid Search" icon="magnifying-glass">
+    Combine semantic (vector) and keyword (BM25) search
+  </Card>
+  <Card title="📊 Multiple Re-ranking" icon="ranking-star">
+    Choose from Cohere API, local cross-encoders, or LLM-based re-ranking
+  </Card>
+  <Card title="📈 Observability" icon="chart-line">
+    Built-in Langfuse integration for tracing and monitoring
+  </Card>
+  <Card title="🔧 Modular Design" icon="puzzle-piece">
+    Use individual components or the complete RAG pipeline
+  </Card>
+</CardGroup>
 
-<Columns cols={2}>
+## Quick Start
+
+Get started with Mini RAG in just 5 lines of code:
+
+```python
+import os
+from mini import AgenticRAG, EmbeddingModel, VectorStore
+
+# Initialize
+embedding_model = EmbeddingModel()
+vector_store = VectorStore(
+    uri=os.getenv("MILVUS_URI"),
+    token=os.getenv("MILVUS_TOKEN"),
+    collection_name="my_docs",
+    dimension=1536
+)
+rag = AgenticRAG(vector_store=vector_store, embedding_model=embedding_model)
+
+# Index a document
+rag.index_document("path/to/document.pdf")
+
+# Ask a question
+response = rag.query("What is this document about?")
+print(response.answer)
+```
+
+<CardGroup cols={2}>
   <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
+    title="Installation"
+    icon="download"
+    href="/installation"
   >
-    Edit your docs locally and preview them in real time.
+    Install Mini RAG and get set up in minutes
   </Card>
   <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
+    title="Quick Start Guide"
+    icon="rocket"
+    href="/quickstart"
   >
-    Customize the design and colors of your site to match your brand.
-  </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+    Follow our step-by-step guide to build your first RAG application
   </Card>
   <Card
-    title="API documentation"
-    icon="terminal"
+    title="API Reference"
+    icon="code"
     href="/api-reference/introduction"
   >
-    Auto-generate API documentation from OpenAPI specifications.
-  </Card>
-</Columns>
-
-## Create beautiful pages
-
-Everything you need to create world-class documentation.
-
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
+    Explore the complete API documentation
   </Card>
   <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
+    title="Examples"
+    icon="lightbulb"
+    href="/examples/document-qa"
   >
-    Add sample code to demonstrate how to use your product.
+    Learn from practical examples and use cases
   </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+</CardGroup>
 
-## Need inspiration?
+## Why Mini RAG?
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+<AccordionGroup>
+  <Accordion title="Simple & Pythonic API">
+    Mini RAG provides a clean, intuitive API that follows Python best practices. Get started with just a few lines of code.
+  </Accordion>
+  
+  <Accordion title="Production Ready">
+    Built with production use cases in mind, featuring error handling, retry logic, observability, and comprehensive configuration options.
+  </Accordion>
+  
+  <Accordion title="Modular Architecture">
+    Use individual components (loader, chunker, embeddings, vector store) or the complete RAG pipeline. Mix and match as needed.
+  </Accordion>
+  
+  <Accordion title="Advanced Features">
+    Query rewriting, hybrid search, multiple re-ranking strategies, and observability built-in—features that typically require custom implementation.
+  </Accordion>
+  
+  <Accordion title="Flexible & Extensible">
+    Support for multiple embedding providers, vector stores, and re-ranking methods. Easy to extend with custom implementations.
+  </Accordion>
+</AccordionGroup>
+
+## Architecture
+
+Mini RAG follows a modular architecture that makes it easy to understand and customize:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      AgenticRAG System                       │
+└─────────────────────────────────────────────────────────────┘
+                              │
+        ┌─────────────────────┼─────────────────────┐
+        │                     │                     │
+        ▼                     ▼                     ▼
+┌──────────────┐    ┌──────────────┐    ┌──────────────┐
+│ DocumentLoader│    │   Chunker    │    │EmbeddingModel│
+│  (MarkItDown) │───▶│  (Chonkie)   │───▶│   (OpenAI)   │
+└──────────────┘    └──────────────┘    └──────────────┘
+                                                 │
+                                                 ▼
+                                        ┌──────────────┐
+                                        │ VectorStore  │
+                                        │   (Milvus)   │
+                                        └──────────────┘
+```
+
+## Community & Support
+
+<CardGroup cols={3}>
+  <Card title="GitHub" icon="github" href="https://github.com/vivek12345/mini-rag">
+    Star us on GitHub and contribute
+  </Card>
+  <Card title="PyPI" icon="python" href="https://pypi.org/project/mini-rag/">
+    View releases and version history
+  </Card>
+  <Card title="Issues" icon="circle-exclamation" href="https://github.com/vivek12345/mini-rag/issues">
+    Report bugs or request features
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<Steps>
+  <Step title="Install Mini RAG">
+    Follow the [installation guide](/installation) to set up Mini RAG
+  </Step>
+  <Step title="Complete Quick Start">
+    Build your first RAG application with our [quick start guide](/quickstart)
+  </Step>
+  <Step title="Explore Features">
+    Learn about [advanced features](/features/agentic-rag) like hybrid search and re-ranking
+  </Step>
+  <Step title="Check Examples">
+    Browse [practical examples](/examples/document-qa) for your use case
+  </Step>
+</Steps>

@@ -1,0 +1,327 @@
+---
+title: "Text Chunking"
+description: "Split documents into optimal chunks for embedding and retrieval"
+---
+
+## Overview
+
+Text chunking is a critical step in RAG systems. The `Chunker` class uses **Chonkie**, a smart text chunking library, to split documents into optimal chunks that:
+
+- Preserve semantic meaning
+- Fit within embedding model token limits
+- Maintain context and relationships
+- Optimize for retrieval quality
+
+## Basic Usage
+
+```python
+from mini.chunker import Chunker
+
+# Initialize chunker
+chunker = Chunker(lang="en")
+
+# Chunk text
+text = "Your long document text here..."
+chunks = chunker.chunk(text)
+
+print(f"Created {len(chunks)} chunks")
+for chunk in chunks:
+    print(f"Tokens: {chunk.token_count}, Text: {chunk.text[:100]}...")
+```
+
+## Chunk Structure
+
+Each chunk is an object with:
+
+```python
+chunk.text          # The chunk text content
+chunk.token_count   # Number of tokens in the chunk
+chunk.start_index   # Starting position in original text
+chunk.end_index     # Ending position in original text
+```
+
+## Chunking Strategies
+
+Chonkie provides multiple chunking strategies. By default, Mini RAG uses the **Markdown recipe**, which is optimized for most text types:
+
+### Markdown Recipe (Default)
+
+```python
+from mini.chunker import Chunker
+
+chunker = Chunker(lang="en")
+chunks = chunker.chunk(text)
+```
+
+This strategy:
+- Respects document structure (headings, paragraphs)
+- Maintains context boundaries
+- Handles code blocks and lists appropriately
+- Works well for technical documentation
+
+### Custom Chunk Size
+
+```python
+from chonkie import SemanticChunker
+
+# For more control, use Chonkie directly
+chunker = SemanticChunker(
+    chunk_size=512,      # Target chunk size in tokens
+    chunk_overlap=50,    # Overlap between chunks
+    min_chunk_size=100   # Minimum chunk size
+)
+
+chunks = chunker.chunk(text)
+```
+
+## Integration with AgenticRAG
+
+When using `AgenticRAG`, chunking is handled automatically:
+
+```python
+from mini import AgenticRAG
+
+rag = AgenticRAG(vector_store=vector_store, embedding_model=embedding_model)
+
+# Chunking happens automatically during indexing
+rag.index_document("document.pdf")
+```
+
+The default chunking strategy works well for most use cases, but you can customize it if needed.
+
+## Why Chunking Matters
+
+<CardGroup cols={2}>
+  <Card title="Token Limits" icon="ruler">
+    Embedding models have token limits (e.g., 8192 for text-embedding-3-small)
+  </Card>
+  <Card title="Retrieval Precision" icon="bullseye">
+    Smaller chunks improve precision by matching specific passages
+  </Card>
+  <Card title="Context Preservation" icon="link">
+    Proper chunking maintains semantic relationships
+  </Card>
+  <Card title="Answer Quality" icon="star">
+    Better chunks lead to more relevant context for LLM
+  </Card>
+</CardGroup>
+
+## Chunking Strategies Comparison
+
+| Strategy | Best For | Pros | Cons |
+|----------|----------|------|------|
+| Markdown | General text, docs | Respects structure | May create variable sizes |
+| Semantic | Long documents | Preserves meaning | More computation |
+| Fixed Size | Uniform processing | Predictable sizes | May break context |
+| Sentence | Short answers | High precision | May lose context |
+
+## Advanced Usage
+
+### Custom Preprocessing
+
+```python
+from mini.loader import DocumentLoader
+from mini.chunker import Chunker
+
+loader = DocumentLoader()
+chunker = Chunker()
+
+# Load and preprocess
+text = loader.load("document.pdf")
+text = text.replace("\n\n\n", "\n\n")  # Clean extra newlines
+
+# Chunk with custom settings
+chunks = chunker.chunk(text)
+```
+
+### Chunk Metadata
+
+When indexing with AgenticRAG, you can add metadata to chunks:
+
+```python
+rag.index_document(
+    "document.pdf",
+    metadata={
+        "source": "research_papers",
+        "author": "John Doe",
+        "year": 2024
+    }
+)
+```
+
+This metadata is preserved with each chunk and can be used for filtering during retrieval.
+
+### Inspecting Chunks
+
+```python
+chunks = chunker.chunk(text)
+
+for i, chunk in enumerate(chunks):
+    print(f"\n=== Chunk {i+1} ===")
+    print(f"Tokens: {chunk.token_count}")
+    print(f"Position: {chunk.start_index} to {chunk.end_index}")
+    print(f"Text preview: {chunk.text[:200]}...")
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Chunk Size Selection">
+    **Optimal chunk size depends on your use case:**
+    
+    - **Question Answering**: 256-512 tokens (precise answers)
+    - **Document Summary**: 512-1024 tokens (more context)
+    - **Code Search**: 256-512 tokens (function/class level)
+    - **Long Documents**: 512-1024 tokens (more context)
+    
+    ```python
+    # The default Markdown recipe handles this automatically
+    chunker = Chunker(lang="en")
+    ```
+  </Accordion>
+
+  <Accordion title="Overlap Strategy">
+    **Use overlap to maintain context across boundaries:**
+    
+    - 10-20% overlap for general text
+    - 20-30% overlap for technical content
+    - More overlap = more chunks but better recall
+    
+    Chonkie's Markdown recipe handles overlap intelligently.
+  </Accordion>
+
+  <Accordion title="Document Structure">
+    **Preserve document structure when possible:**
+    
+    - Keep headings with their content
+    - Don't split tables or code blocks
+    - Maintain paragraph integrity
+    - The Markdown recipe does this automatically
+  </Accordion>
+
+  <Accordion title="Token Counting">
+    **Be aware of tokenization differences:**
+    
+    - Different models use different tokenizers
+    - Chunk size is approximate
+    - Test with your specific embedding model
+  </Accordion>
+</AccordionGroup>
+
+## Common Patterns
+
+### Pattern 1: Standard Document Processing
+
+```python
+from mini import AgenticRAG
+
+rag = AgenticRAG(vector_store=vector_store, embedding_model=embedding_model)
+rag.index_document("document.pdf")  # Uses optimal defaults
+```
+
+### Pattern 2: Custom Chunking with Manual Pipeline
+
+```python
+from mini.loader import DocumentLoader
+from mini.chunker import Chunker
+from mini.embedding import EmbeddingModel
+from mini.store import VectorStore
+
+# Load
+loader = DocumentLoader()
+text = loader.load("document.pdf")
+
+# Chunk
+chunker = Chunker()
+chunks = chunker.chunk(text)
+
+# Embed and store
+embedding_model = EmbeddingModel()
+embeddings = embedding_model.embed_chunks([c.text for c in chunks])
+vector_store.insert(embeddings, [c.text for c in chunks])
+```
+
+### Pattern 3: Batch Processing
+
+```python
+documents = ["doc1.pdf", "doc2.pdf", "doc3.pdf"]
+loader = DocumentLoader()
+chunker = Chunker()
+
+all_chunks = []
+for doc in documents:
+    text = loader.load(doc)
+    chunks = chunker.chunk(text)
+    all_chunks.extend(chunks)
+
+print(f"Total chunks: {len(all_chunks)}")
+```
+
+## Performance Tips
+
+<CardGroup cols={2}>
+  <Card title="Batch Operations" icon="layer-group">
+    Process multiple documents together for better performance
+  </Card>
+  <Card title="Cache Results" icon="database">
+    Cache chunked results if reprocessing same documents
+  </Card>
+  <Card title="Monitor Token Count" icon="gauge">
+    Keep chunks under embedding model limits
+  </Card>
+  <Card title="Optimize Structure" icon="chart-line">
+    Clean document structure before chunking
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Chunks too large">
+    **Solution:** Use a smaller target chunk size:
+    
+    ```python
+    from chonkie import SemanticChunker
+    
+    chunker = SemanticChunker(chunk_size=256)
+    ```
+  </Accordion>
+
+  <Accordion title="Chunks breaking context">
+    **Solution:** Increase overlap or use semantic chunking:
+    
+    ```python
+    chunker = SemanticChunker(
+        chunk_size=512,
+        chunk_overlap=100  # 100 tokens overlap
+    )
+    ```
+  </Accordion>
+
+  <Accordion title="Performance issues">
+    **Solution:** The default Markdown recipe is optimized for performance. If you need faster processing:
+    
+    ```python
+    # Use the default chunker
+    chunker = Chunker(lang="en")  # Fast and efficient
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Embeddings" icon="wand-magic-sparkles" href="/core/embeddings">
+    Generate embeddings from chunks
+  </Card>
+  <Card title="Vector Store" icon="database" href="/core/vector-store">
+    Store and search chunks
+  </Card>
+  <Card title="AgenticRAG" icon="robot" href="/features/agentic-rag">
+    Use the complete pipeline
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference/chunker">
+    Complete API documentation
+  </Card>
+</CardGroup>
+
